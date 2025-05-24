@@ -1,0 +1,23 @@
+# Global node dependencies
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.*
+
+# IDE/editor settings
+.vscode/
+.idea/
+*.swp
+
+# Output folders
+dist/
+build/

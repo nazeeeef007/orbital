@@ -1,27 +1,25 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import React from "react";
+import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
 export default function HomeScreen() {
   const router = useRouter();
 
   const handleLogout = () => {
-    router.replace('/login');
+    router.replace("/login");
   };
 
   const handleReportIncident = () => {
-    router.push('/reportIncident');
+    router.push("/reportIncident");
   };
 
   const handleIncidentFeed = () => {
-    router.push('/incidentFeed');
+    router.push("/incidentFeed");
+  };
+
+  const handleStartChat = () => {
+    router.push("/chatBot");
   };
 
   return (
@@ -33,7 +31,7 @@ export default function HomeScreen() {
 
       <View style={styles.profileSection}>
         <Image
-          source={{ uri: 'https://i.pravatar.cc/150?img=12' }}
+          source={{ uri: "https://i.pravatar.cc/150?img=12" }}
           style={styles.avatar}
         />
         <Text style={styles.welcomeText}>Hello, User 👋</Text>
@@ -41,6 +39,14 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.actions}>
+        <TouchableOpacity
+          style={[styles.button, styles.reportButton]}
+          onPress={handleStartChat}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="alert-circle-outline" size={22} color="#fff" />
+          <Text style={styles.buttonText}>Start Chat</Text>
+        </TouchableOpacity>
         {/* Report Incident Button */}
         <TouchableOpacity
           style={[styles.button, styles.reportButton]}
@@ -57,8 +63,7 @@ export default function HomeScreen() {
           activeOpacity={0.8}
         >
           <Ionicons name="alert-circle-outline" size={22} color="#fff" />
-          <Text style={styles.buttonText}> View Incident Feed
-          </Text>
+          <Text style={styles.buttonText}> View Incident Feed</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.button}>
@@ -81,27 +86,27 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: "#f3f4f6",
     paddingTop: 60,
     paddingHorizontal: 24,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#4f46e5',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#4f46e5",
     padding: 20,
     borderRadius: 12,
     marginBottom: 30,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   headerText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 22,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginLeft: 12,
   },
   profileSection: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 40,
   },
   avatar: {
@@ -112,35 +117,35 @@ const styles = StyleSheet.create({
   },
   welcomeText: {
     fontSize: 22,
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: "600",
+    color: "#111827",
   },
   subText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: "#6b7280",
     marginTop: 4,
   },
   actions: {
     gap: 16,
   },
   button: {
-    backgroundColor: '#6366f1',
-    flexDirection: 'row',
-    alignItems: 'center',
+    backgroundColor: "#6366f1",
+    flexDirection: "row",
+    alignItems: "center",
     padding: 14,
     borderRadius: 10,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   reportButton: {
-    backgroundColor: '#dc2626', // A bold red color for urgency
+    backgroundColor: "#dc2626", // A bold red color for urgency
   },
   logoutButton: {
-    backgroundColor: '#ef4444',
+    backgroundColor: "#ef4444",
   },
   buttonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
     marginLeft: 8,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 });

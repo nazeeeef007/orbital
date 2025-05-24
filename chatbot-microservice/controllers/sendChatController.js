@@ -6,11 +6,7 @@ const sendChat = async (req, res) => {
     if (!prompt) {
       return res.status(400).json({ error: "Prompt is required" });
     }
-
-    // const context = `You are a nutrition expert in Singaporean food. 
-    // Given a food item, estimate its 'calories' (kcal), 'carbohydrates', 'protein',
-    // 'fat', and 'sugar' (grams). Respond with valid JSON with integer values only.
-    // If input is not a food item, return an error message.`;
+    console.log(`Received request for ${prompt}`);
 
     const messages = [
       { role: "system", content: context },
@@ -19,7 +15,7 @@ const sendChat = async (req, res) => {
 
     const openai = req.openai;
     const response = await openai.chat.completions.create({
-      model: "gpt-4.1-mini", 
+      model: "gpt-4.1-mini",
       messages,
     });
 
@@ -30,20 +26,29 @@ const sendChat = async (req, res) => {
 
       // Check if all expected keys exist and are integers
       const keys = ["calories", "carbohydrates", "protein", "fat", "sugar"];
-      const valid = keys.every((key) => Number.isInteger(parsed[key]));
+      const valid =
+        keys.every((key) => parsed[key] != undefined) &&
+        keys.every((key) => Number.isInteger(parsed[key]));
 
       if (!valid) {
+        console.log("Invalid output");
         return res
           .status(422)
           .json({ error: "Invalid nutritional data format." });
       }
+      console.log(`Calores: ${parsed.calories}`);
+      console.log(`Carbohydrates: ${parsed.carbohydrates}`);
+      console.log(`Protein: ${parsed.protein}`);
+      console.log(`Fat: ${parsed.fat}`);
+      console.log(`Sugar: ${parsed.sugar}`);
 
       res.status(200).json(parsed);
     } catch (parseErr) {
       // If it’s not valid JSON, assume it's an error message from the AI
-      return res
-        .status(422)
-        .json({ error: "Invalid input or not a food item, please try again", message: answer });
+      return res.status(422).json({
+        error: "Invalid input or not a food item, please try again",
+        message: answer,
+      });
     }
   } catch (error) {
     console.error(error);
