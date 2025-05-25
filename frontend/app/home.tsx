@@ -6,26 +6,16 @@ import { useRouter } from "expo-router";
 export default function HomeScreen() {
   const router = useRouter();
 
-  const handleLogout = () => {
-    router.replace("/login");
-  };
-
-  const handleReportIncident = () => {
-    router.push("/reportIncident");
-  };
-
-  const handleIncidentFeed = () => {
-    router.push("/incidentFeed");
-  };
-
-  const handleStartChat = () => {
-    router.push("/chatBot");
-  };
+  const handleLogout = () => router.replace("/login");
+  const handleViewMeals = () => router.push("/meal");
+  const handleUpload = () => router.push("/upload");
+  const handleStartChat = () => router.push("/chatBot");
+  const handleViewProfile = () => router.push("/profile");
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Ionicons name="home-outline" size={32} color="#fff" />
+        <Ionicons name="home-outline" size={28} color="#fff" />
         <Text style={styles.headerText}>Welcome Home</Text>
       </View>
 
@@ -40,35 +30,35 @@ export default function HomeScreen() {
 
       <View style={styles.actions}>
         <TouchableOpacity
-          style={[styles.button, styles.reportButton]}
+          style={[styles.button, styles.primaryButton]}
           onPress={handleStartChat}
-          activeOpacity={0.8}
         >
-          <Ionicons name="alert-circle-outline" size={22} color="#fff" />
+          <Ionicons name="chatbox-ellipses-outline" size={20} color="#fff" />
           <Text style={styles.buttonText}>Start Chat</Text>
         </TouchableOpacity>
-        {/* Report Incident Button */}
+
         <TouchableOpacity
-          style={[styles.button, styles.reportButton]}
-          onPress={handleReportIncident}
-          activeOpacity={0.8}
+          style={styles.outlineButton}
+          onPress={handleViewMeals}
         >
-          <Ionicons name="alert-circle-outline" size={22} color="#fff" />
-          <Text style={styles.buttonText}>Report Incident</Text>
+          <Ionicons name="restaurant-outline" size={20} color="#7c3aed" />
+          <Text style={styles.outlineText}>View Meals</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.button, styles.reportButton]}
-          onPress={handleIncidentFeed}
-          activeOpacity={0.8}
+          style={styles.outlineButton}
+          onPress={handleUpload}
         >
-          <Ionicons name="alert-circle-outline" size={22} color="#fff" />
-          <Text style={styles.buttonText}> View Incident Feed</Text>
+          <Ionicons name="cloud-upload-outline" size={20} color="#7c3aed" />
+          <Text style={styles.outlineText}>Upload Meal</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.button}>
-          <Ionicons name="person-circle-outline" size={20} color="#fff" />
-          <Text style={styles.buttonText}>View Profile</Text>
+         <TouchableOpacity
+          style={styles.outlineButton}
+          onPress={handleViewProfile}
+        >
+          <Ionicons name="person-outline" size={20} color="#7c3aed" />
+          <Text style={styles.outlineText}>View Profile</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -86,24 +76,28 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: "#f9fafb",
     paddingTop: 60,
     paddingHorizontal: 24,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#4f46e5",
-    padding: 20,
+    backgroundColor: "#7c3aed",
+    padding: 16,
     borderRadius: 12,
-    marginBottom: 30,
     justifyContent: "center",
+    marginBottom: 30,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
   },
   headerText: {
     color: "#fff",
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "bold",
-    marginLeft: 12,
+    marginLeft: 10,
   },
   profileSection: {
     alignItems: "center",
@@ -118,7 +112,7 @@ const styles = StyleSheet.create({
   welcomeText: {
     fontSize: 22,
     fontWeight: "600",
-    color: "#111827",
+    color: "#1f2937",
   },
   subText: {
     fontSize: 14,
@@ -126,26 +120,42 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   actions: {
-    gap: 16,
+    gap: 14,
   },
   button: {
-    backgroundColor: "#6366f1",
     flexDirection: "row",
     alignItems: "center",
     padding: 14,
     borderRadius: 10,
     justifyContent: "center",
   },
-  reportButton: {
-    backgroundColor: "#dc2626", // A bold red color for urgency
+  primaryButton: {
+    backgroundColor: "#7c3aed",
   },
   logoutButton: {
     backgroundColor: "#ef4444",
+    marginTop: 10,
+  },
+  outlineButton: {
+    borderWidth: 1.5,
+    borderColor: "#7c3aed",
+    backgroundColor: "#fff",
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 10,
+    justifyContent: "center",
   },
   buttonText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 15,
     marginLeft: 8,
-    fontWeight: "500",
+    fontWeight: "600",
+  },
+  outlineText: {
+    color: "#7c3aed",
+    fontSize: 15,
+    marginLeft: 8,
+    fontWeight: "600",
   },
 });

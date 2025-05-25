@@ -3,24 +3,25 @@ const cors = require('cors');
 const app = express();
 require('dotenv').config();
 
-const authRoutes = require('./routes/authRoutes');
-const profileRoutes = require('./routes/profileRoutes');
-const incidentRoutes = require('./routes/incidentRoutes');
+const authRoutes     = require('./routes/authRoutes');
+const profileRoutes  = require('./routes/profileRoutes');
 const chatBotRoutes = require('./routes/chatBotRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
+const mealRoutes = require('./routes/mealRoutes');
 
-// ✅ Enable CORS for frontend at localhost:5173
-app.use(cors({
-  origin: 'http://localhost:8081',
-  credentials: true, // Optional: if using cookies/auth headers
-}));
+app.use(cors({ origin: '*', credentials: true }));
+// app.options('*', cors());
 
 app.use(express.json());
-
-app.use('/api/auth', authRoutes);
-app.use('/api/profile', profileRoutes);
-app.use('/api/incidents', incidentRoutes);
+app.use('/api/auth',     authRoutes);
+app.use('/api/profile',  profileRoutes);
 app.use('/api/bot', chatBotRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/meals', mealRoutes);
 
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+const LOCAL_IP = '192.168.68.110';  // your machine’s LAN IP
+const PORT     = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://${LOCAL_IP}:${PORT}`);
+});

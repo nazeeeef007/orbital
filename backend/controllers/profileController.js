@@ -1,55 +1,136 @@
-const supabase = require("../models/supabaseClient");
+const supabase = require('../models/supabaseClient');
+const path = require('path');
+const fs = require('fs');
 
-exports.getProfile = async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const {
+      username,
+      display_name,
+      bio,
+      location,
+      website,
+      daily_calories,
+      protein_goal,
+      carbs_goal,
+      fat_goal,
+    } = req.body;
 
-  const token = authHeader.split(" ")[1];
+    // Handle avatar upload file path (optional)
+    let avatar_url = null;
+    if (req.file) {
+      avatar_url = `/uploads/${req.file.filename}`;
+    }
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser(token);
+    // Check if a profile row already exists
+    const { data: existingProfile, error: fetchError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single();
 
-  if (userError) return res.status(401).json({ error: "Invalid token" });
+    // If not found (PGRST116), insert one with a temporary username
+if (fetchError && fetchError.code === 'PGRST116') {
+  const tempUsername = `user_${userId.slice(0, 8)}`; // generate temp unique username
+  const { error: insertError } = await supabase
+    .from('profiles')
+    .insert([{ 
+      id: userId, 
+      username: tempUsername 
+    }]);
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .single();
+  if (insertError) {
+    console.error('Error inserting profile:', insertError);
+    return res.status(500).json({ error: 'Failed to initialize user profile' });
+  }
+} else if (fetchError) {
+  // Other errors
+  console.error('Error fetching profile:', fetchError);
+  return res.status(500).json({ error: 'Failed to check profile' });
+}
 
-  if (error) return res.status(500).json({ error: error.message });
-  res.status(200).json(data);
+
+    // Check username uniqueness
+    if (username) {
+      const { data: existingUser, error: userError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', username)
+        .neq('id', userId)
+        .single();
+
+      if (existingUser) {
+        return res.status(400).json({ error: 'Username already taken' });
+      }
+    }
+
+    // Prepare update payload
+    const updates = {
+      username,
+      display_name,
+      bio,
+      location,
+      website,
+      daily_calories,
+      protein_goal,
+      carbs_goal,
+      fat_goal,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (avatar_url) updates.avatar_url = avatar_url;
+
+    // Clean undefined fields
+    Object.keys(updates).forEach(
+      (key) => updates[key] === undefined && delete updates[key]
+    );
+
+    // Update profile
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error('Supabase update error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.status(200).json({ message: 'Profile updated', profile: data });
+  } catch (err) {
+    console.error('Update profile error:', err);
+    res.status(500).json({ error: 'Unexpected error updating profile' });
+  }
 };
 
-exports.updateProfile = async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+const getProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
 
-  const token = authHeader.split(" ")[1];
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select(
+        'username, display_name, bio, location, website, daily_calories, protein_goal, carbs_goal, fat_goal, avatar_url'
+      )
+      .eq('id', userId)
+      .single();
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser(token);
+    if (error) {
+      console.error('Error fetching profile:', error);
+      return res.status(500).json({ error: 'Failed to fetch profile' });
+    }
 
-  if (userError) return res.status(401).json({ error: "Invalid token" });
+    return res.json(profile);
+  } catch (err) {
+    console.error('Unexpected error in getProfile:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+};
 
-  const { height, weight, calories } = req.body;
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .upsert({
-      user_id: user.id,
-      height,
-      weight,
-      calories,
-    })
-    .select()
-    .single();
-
-  if (error) return res.status(500).json({ error: error.message });
-
-  res.status(200).json({ message: "Profile updated", profile: data });
+module.exports = {
+  updateProfile,
+  getProfile
 };

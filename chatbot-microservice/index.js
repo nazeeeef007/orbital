@@ -25,4 +25,3 @@ app.post('/text', sendChat); //Takes {context, prompt} returns {calores: int, fa
 app.listen(port, () => {
   console.log(`Chatbot microservice listening at http://localhost:${port}`);
 });
-

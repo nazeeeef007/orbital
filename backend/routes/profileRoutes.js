@@ -1,8 +1,17 @@
-const express = require("express");
+// routes/profile.js
+const express = require('express');
 const router = express.Router();
-const { getProfile, updateProfile } = require("../controllers/profileController");
+const { authenticate } = require('../middleware/authMiddleware');
+const upload = require('../middleware/multerMiddleware'); // multer for avatar upload
+const profileController = require('../controllers/profileController');
 
-router.get("/", getProfile);
-router.post("/", updateProfile); // can also be put as PUT method
+router.put(
+  '/profile',
+  authenticate,
+  upload.single('avatar'), // handle avatar upload, field name = avatar
+  profileController.updateProfile
+);
+
+router.get('/me', authenticate, profileController.getProfile);
 
 module.exports = router;
