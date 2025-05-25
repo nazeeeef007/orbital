@@ -23,5 +23,5 @@ app.use((req, res, next) => {
 app.post('/text', sendChat); //Takes {context, prompt} returns {calores: int, fat: int ...}
 
 app.listen(port, () => {
-  console.log(`Chatbot microservice listening at http://localhost:${port}`);
+  console.log(`Chatbot microservice listening at http://${process.env.BASE_URL}:${port}`);
 });

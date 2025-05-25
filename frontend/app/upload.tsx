@@ -14,10 +14,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { useRouter } from 'expo-router';
-
-const BASE_URL = Platform.OS === 'web'
-  ? 'http://localhost:3000'
-  : 'http://192.168.68.110:3000';
+import { BASE_URL } from "@/config";
 
 export default function UploadScreen() {
   const router = useRouter();
@@ -80,7 +77,7 @@ export default function UploadScreen() {
         formData.append('carbs', carbs);
         formData.append('fat', fat);
 
-        const response = await fetch(`${BASE_URL}/api/upload/upload`, {
+        const response = await fetch(`http://${BASE_URL}:3000/api/upload/upload`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`,

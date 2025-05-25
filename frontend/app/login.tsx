@@ -13,13 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import AuthTextInput from '../components/AuthTextInput';
 import * as SecureStore from 'expo-secure-store'; // ⬅️ add this at the top
-
-
-// at top of file
-const BASE_URL =
-  Platform.OS === 'web'
-    ? 'http://localhost:3000'
-    : 'http://192.168.68.110:3000'; // ← your machine IP
+import { BASE_URL } from "@/config";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -34,10 +28,9 @@ export default function LoginScreen() {
       setMessage({ type: 'error', text: 'Please enter both email and password.' });
       return;
     }
-
     setLoading(true);
     try {
-      const response = await fetch(`${BASE_URL}/api/auth/login`, {
+      const response = await fetch(`http://${BASE_URL}:3000/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -56,14 +49,14 @@ export default function LoginScreen() {
           setMessage({ type: 'error', text: data.error || 'Login failed. Please check your credentials.' });
         }
       } else {
-        const { session, user } = data.data;
+        // const { session, user } = data.data;
 
 
-        if (!session || !session.access_token) {
-          setMessage({ type: 'error', text: 'Login failed: token missing.' });
-          return;
-        }
-        await SecureStore.setItemAsync('authToken', session.access_token); // ✅ Correct method
+        // if (!session || !session.access_token) {
+        //   setMessage({ type: 'error', text: 'Login failed: token missing.' });
+        //   return;
+        // }
+        // await SecureStore.setItemAsync('authToken', session.access_token); // ✅ Correct method
         setMessage({ type: 'success', text: 'Login successful! Redirecting...' });
         setTimeout(() => {
           router.replace('/home');

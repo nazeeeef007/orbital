@@ -12,10 +12,7 @@ import {
   Pressable
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-
-const BASE_URL = Platform.OS === 'web'
-  ? 'http://localhost:3000'
-  : 'http://192.168.68.110:3000';
+import { BASE_URL } from "@/config";
 
 const Meals = () => {
   const [meals, setMeals] = useState([]);
@@ -32,7 +29,7 @@ const Meals = () => {
         return;
       }
 
-      const response = await fetch(`${BASE_URL}/api/meals`, {
+      const response = await fetch(`http://${BASE_URL}:3000/api/meals`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

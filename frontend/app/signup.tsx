@@ -12,10 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import AuthTextInput from '../components/AuthTextInput';
 // at top of file
-const BASE_URL =
-  Platform.OS === 'web'
-    ? 'http://localhost:3000'
-    : 'http://192.168.68.110:3000'; // ← your machine IP
+import { BASE_URL } from "@/config";
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -31,7 +28,7 @@ export default function SignupScreen() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${BASE_URL}/api/auth/signup`, {
+      const response = await fetch(`http://${BASE_URL}:3000/api/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

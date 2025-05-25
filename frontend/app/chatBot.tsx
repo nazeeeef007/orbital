@@ -9,6 +9,8 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { BASE_URL } from "@/config";
+import { useMacroStore } from "@/store/useMacroStore";
 
 export default function ChatBotScreen() {
   const [prompt, setPrompt] = useState("");
@@ -21,6 +23,7 @@ export default function ChatBotScreen() {
     sugar: number;
   }>(null);
   const [invalidInput, setInvalid] = useState("");
+  const { macros, addMacros, clearMacros } = useMacroStore();
 
   const handleSend = async () => {
     if (!prompt.trim()) return;
@@ -29,7 +32,7 @@ export default function ChatBotScreen() {
     setInvalid("");
 
     try {
-      const res = await fetch("http://localhost:3000/api/bot/chat", {
+      const res = await fetch(`http://${BASE_URL}:3000/api/bot/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
@@ -42,6 +45,7 @@ export default function ChatBotScreen() {
       }
 
       console.log(data);
+      addMacros(data);
       setNutrition(data);
     } catch (error) {
       console.log(invalidInput);
@@ -98,6 +102,25 @@ export default function ChatBotScreen() {
           </Text>
           <Text style={styles.resultText}>🥑 Fat: {nutrition.fat}g</Text>
           <Text style={styles.resultText}>🍬 Sugar: {nutrition.sugar}g</Text>
+        </View>
+      )}
+
+      {macros && (
+        <View style={styles.resultBox}>
+          <Text style={styles.resultText}>📊 Total Macros Consumed:</Text>
+          <Text style={styles.resultText}>
+            🔥 Calories: {macros.calories} kcal
+          </Text>
+          <Text style={styles.resultText}>
+            🍞 Carbs: {macros.carbohydrates}g
+          </Text>
+          <Text style={styles.resultText}>🍗 Protein: {macros.protein}g</Text>
+          <Text style={styles.resultText}>🥑 Fats: {macros.fat}g</Text>
+          <Text style={styles.resultText}>🍬 Sugars: {macros.sugar}g</Text>
+
+          <TouchableOpacity style={styles.resetButton} onPress={clearMacros}>
+            <Text style={styles.resetButtonText}>Reset Macros</Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -161,5 +184,18 @@ const styles = StyleSheet.create({
     color: "#b91c1c",
     fontWeight: "600",
     fontSize: 14,
+  },
+
+  resetButton: {
+    marginTop: 16,
+    backgroundColor: "#ef4444",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  resetButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
   },
 });

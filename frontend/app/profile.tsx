@@ -18,10 +18,7 @@ import {
 } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
-
-const BASE_URL = Platform.OS === 'web'
-  ? 'http://localhost:3000'
-  : 'http://192.168.68.110:3000';
+import { BASE_URL } from "@/config";
 
 import * as SecureStore from 'expo-secure-store'; // ⬅️ Add this import at the top
 
@@ -55,7 +52,7 @@ const Profile = () => {
         }
         setToken(storedToken);
 
-        const res = await axios.get(`${BASE_URL}/api/profile/me`, {
+        const res = await axios.get(`http://${BASE_URL}:3000/api/profile/me`, {
           headers: { Authorization: `Bearer ${storedToken}` },
         });
 
@@ -71,7 +68,7 @@ const Profile = () => {
           carbs_goal: data.carbs_goal?.toString() || '',
           fat_goal: data.fat_goal?.toString() || '',
         });
-        setAvatar(data.avatar_url ? `${BASE_URL}${data.avatar_url}` : null);
+        setAvatar(data.avatar_url ? `http://${BASE_URL}:3000${data.avatar_url}` : null);
       } catch (err) {
         Alert.alert('Error', 'Failed to load profile');
       }
@@ -129,7 +126,7 @@ const Profile = () => {
         });
       }
 
-      const res = await axios.put(`${BASE_URL}/api/profile/profile`, formData, {
+      const res = await axios.put(`http://${BASE_URL}:3000/api/profile/profile`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           Authorization: `Bearer ${token}`,

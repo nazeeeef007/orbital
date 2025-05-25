@@ -20,8 +20,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/meals', mealRoutes);
 
 
-const LOCAL_IP = '192.168.68.110';  // your machine’s LAN IP
 const PORT     = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://${LOCAL_IP}:${PORT}`);
+  console.log(`Server running on http://${process.env.BASE_URL}:${PORT}`);
 });
