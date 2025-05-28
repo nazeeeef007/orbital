@@ -2,7 +2,7 @@ const supabase = require('../models/supabaseClient');
 
 const getUserMeals = async (req, res) => {
   const userId = req.user.id;
-
+  console.log("getting User Meals!");
   const { data, error } = await supabase
     .from('meals')
     .select('*')

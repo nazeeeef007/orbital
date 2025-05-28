@@ -2,6 +2,7 @@ const supabase = require('../models/supabaseClient');
 const path = require('path');
 const fs = require('fs');
 
+
 const updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -12,46 +13,67 @@ const updateProfile = async (req, res) => {
       location,
       website,
       daily_calories,
+      daily_protein,
+      daily_carbs,
+      daily_fat,
+      calories_goal,
       protein_goal,
       carbs_goal,
       fat_goal,
     } = req.body;
 
-    // Handle avatar upload file path (optional)
     let avatar_url = null;
+
+    // Upload to Supabase bucket if avatar file exists
     if (req.file) {
-      avatar_url = `/uploads/${req.file.filename}`;
+      const fileExt = path.extname(req.file.originalname);
+      const fileName = `avatars/${userId}-${Date.now()}${fileExt}`;
+      const fileBuffer = req.file.buffer;
+
+
+      const { error: uploadError } = await supabase.storage
+        .from('profile-images')
+        .upload(fileName, fileBuffer, {
+          contentType: req.file.mimetype,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error('Error uploading avatar:', uploadError);
+        return res.status(500).json({ error: 'Failed to upload avatar' });
+      }
+
+      // Get public URL of uploaded file
+      const { data: publicUrlData } = supabase.storage
+        .from('profile-images')
+        .getPublicUrl(fileName);
+
+      avatar_url = publicUrlData.publicUrl;
     }
 
-    // Check if a profile row already exists
+    // Check if profile exists
     const { data: existingProfile, error: fetchError } = await supabase
       .from('profiles')
       .select('id')
       .eq('id', userId)
       .single();
 
-    // If not found (PGRST116), insert one with a temporary username
-if (fetchError && fetchError.code === 'PGRST116') {
-  const tempUsername = `user_${userId.slice(0, 8)}`; // generate temp unique username
-  const { error: insertError } = await supabase
-    .from('profiles')
-    .insert([{ 
-      id: userId, 
-      username: tempUsername 
-    }]);
+    if (fetchError && fetchError.code === 'PGRST116') {
+      const tempUsername = `user_${userId.slice(0, 8)}`;
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert([{ id: userId, username: tempUsername }]);
 
-  if (insertError) {
-    console.error('Error inserting profile:', insertError);
-    return res.status(500).json({ error: 'Failed to initialize user profile' });
-  }
-} else if (fetchError) {
-  // Other errors
-  console.error('Error fetching profile:', fetchError);
-  return res.status(500).json({ error: 'Failed to check profile' });
-}
+      if (insertError) {
+        console.error('Error inserting profile:', insertError);
+        return res.status(500).json({ error: 'Failed to initialize user profile' });
+      }
+    } else if (fetchError) {
+      console.error('Error fetching profile:', fetchError);
+      return res.status(500).json({ error: 'Failed to check profile' });
+    }
 
-
-    // Check username uniqueness
+    // Username uniqueness check
     if (username) {
       const { data: existingUser, error: userError } = await supabase
         .from('profiles')
@@ -65,7 +87,7 @@ if (fetchError && fetchError.code === 'PGRST116') {
       }
     }
 
-    // Prepare update payload
+    // Build update payload
     const updates = {
       username,
       display_name,
@@ -73,6 +95,10 @@ if (fetchError && fetchError.code === 'PGRST116') {
       location,
       website,
       daily_calories,
+      daily_protein,
+      daily_carbs,
+      daily_fat,
+      calories_goal,
       protein_goal,
       carbs_goal,
       fat_goal,
@@ -81,12 +107,10 @@ if (fetchError && fetchError.code === 'PGRST116') {
 
     if (avatar_url) updates.avatar_url = avatar_url;
 
-    // Clean undefined fields
     Object.keys(updates).forEach(
       (key) => updates[key] === undefined && delete updates[key]
     );
 
-    // Update profile
     const { data, error } = await supabase
       .from('profiles')
       .update(updates)
@@ -99,20 +123,25 @@ if (fetchError && fetchError.code === 'PGRST116') {
     }
 
     res.status(200).json({ message: 'Profile updated', profile: data });
+
   } catch (err) {
     console.error('Update profile error:', err);
     res.status(500).json({ error: 'Unexpected error updating profile' });
   }
 };
 
+
 const getProfile = async (req, res) => {
+  console.log("reached getProfile!")
   try {
     const userId = req.user.id;
-
+    console.log("getting profile");
     const { data: profile, error } = await supabase
       .from('profiles')
       .select(
-        'username, display_name, bio, location, website, daily_calories, protein_goal, carbs_goal, fat_goal, avatar_url'
+        'username, display_name, bio, location, website, avatar_url, ' +
+        'daily_calories, daily_protein, daily_carbs, daily_fat, ' +
+        'calories_goal, protein_goal, carbs_goal, fat_goal'
       )
       .eq('id', userId)
       .single();

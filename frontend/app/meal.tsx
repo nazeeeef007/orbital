@@ -6,13 +6,12 @@ import {
   Image,
   StyleSheet,
   ActivityIndicator,
-  Platform,
   TouchableOpacity,
   Modal,
-  Pressable
+  Pressable,
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { BASE_URL } from "@/config";
+import { BASE_URL } from '@/config';
 
 const Meals = () => {
   const [meals, setMeals] = useState([]);
@@ -86,15 +85,11 @@ const Meals = () => {
             </View>
 
             <View style={styles.footer}>
-              <TouchableOpacity>
-                <Text style={styles.footerIcon}>❤️</Text>
-              </TouchableOpacity>
-              <TouchableOpacity>
-                <Text style={styles.footerIcon}>💬</Text>
-              </TouchableOpacity>
-              <TouchableOpacity>
-                <Text style={styles.footerIcon}>🔖</Text>
-              </TouchableOpacity>
+              {['❤️', '💬', '🔖'].map((icon, index) => (
+                <TouchableOpacity key={index} style={styles.footerButton}>
+                  <Text style={styles.footerIcon}>{icon}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
         )}
@@ -113,67 +108,73 @@ const Meals = () => {
 
 const styles = StyleSheet.create({
   listContainer: {
-    padding: 15,
+    padding: 16,
   },
   card: {
-    marginBottom: 20,
     backgroundColor: '#fff',
-    borderRadius: 15,
+    borderRadius: 20,
     overflow: 'hidden',
+    marginBottom: 24,
     shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
   },
   mainImage: {
     width: '100%',
-    aspectRatio: 1.3, // maintain aspect ratio (feel more IG)
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
+    height: 220,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   infoContainer: {
-    padding: 15,
+    padding: 16,
   },
   caption: {
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
     marginBottom: 10,
-    color: '#222',
   },
   macrosRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 4,
+    marginBottom: 10,
+    paddingHorizontal: 4,
   },
   macro: {
     fontSize: 13,
-    color: '#777',
+    color: '#666',
+    fontWeight: '500',
   },
   recipeImage: {
-    marginTop: 12,
     width: '100%',
-    height: 120,
-    borderRadius: 10,
+    height: 130,
+    borderRadius: 12,
+    marginTop: 12,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: '#f1f1f1',
+  },
+  footerButton: {
+    padding: 6,
+    borderRadius: 8,
   },
   footerIcon: {
     fontSize: 22,
-    opacity: 0.8,
+    opacity: 0.85,
   },
   modalBackground: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.95)',
+    backgroundColor: 'rgba(0,0,0,0.96)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   fullscreenImage: {
-    width: '90%',
+    width: '92%',
     height: '70%',
   },
 });

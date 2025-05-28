@@ -11,6 +11,7 @@ export default function HomeScreen() {
   const handleUpload = () => router.push("/upload");
   const handleStartChat = () => router.push("/chatBot");
   const handleViewProfile = () => router.push("/profile");
+  const handleSearch = () => router.push("/search");
 
   return (
     <View style={styles.container}>
@@ -59,6 +60,14 @@ export default function HomeScreen() {
         >
           <Ionicons name="person-outline" size={20} color="#7c3aed" />
           <Text style={styles.outlineText}>View Profile</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.outlineButton}
+          onPress={handleSearch}
+        >
+          <Ionicons name="person-outline" size={20} color="#7c3aed" />
+          <Text style={styles.outlineText}>Search</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

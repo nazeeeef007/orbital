@@ -49,14 +49,15 @@ export default function LoginScreen() {
           setMessage({ type: 'error', text: data.error || 'Login failed. Please check your credentials.' });
         }
       } else {
-        // const { session, user } = data.data;
+        const { session, user } = data.data;
 
 
-        // if (!session || !session.access_token) {
-        //   setMessage({ type: 'error', text: 'Login failed: token missing.' });
-        //   return;
-        // }
-        // await SecureStore.setItemAsync('authToken', session.access_token); // ✅ Correct method
+        if (!session || !session.access_token) {
+          setMessage({ type: 'error', text: 'Login failed: token missing.' });
+          return;
+        }
+        await SecureStore.setItemAsync('authToken', session.access_token); // ✅ Correct method
+        console.log(session.access_token);
         setMessage({ type: 'success', text: 'Login successful! Redirecting...' });
         setTimeout(() => {
           router.replace('/home');
