@@ -56,7 +56,11 @@ export default function LoginScreen() {
           setMessage({ type: 'error', text: 'Login failed: token missing.' });
           return;
         }
-        await SecureStore.setItemAsync('authToken', session.access_token); // ✅ Correct method
+        
+        if (Platform.OS !== 'web') {
+          await SecureStore.setItemAsync('authToken', session.access_token); //Dont work on web
+        }
+
         console.log(session.access_token);
         setMessage({ type: 'success', text: 'Login successful! Redirecting...' });
         setTimeout(() => {

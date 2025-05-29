@@ -11,7 +11,7 @@ async function getMacroChat(req, res) {
     'fat', and 'sugar' (grams). Respond with valid JSON with integer values only.
     If input is not a food item, return an error message.`;
 
-    const response = await fetch(`http://${process.env.BASE_URL}:3000/text`, {
+    const response = await fetch(`http://${process.env.BASE_URL}:3699/text`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ context, prompt }),
