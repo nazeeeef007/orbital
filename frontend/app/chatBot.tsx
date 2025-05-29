@@ -9,8 +9,10 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { botApi } from "@/apis/botApi";
+import { mealApi } from "@/apis/mealApi";
 import { BASE_URL } from "@/config";
-import { useMacroStore } from "@/store/useMacroStore";
+// import { useMacroStore } from "@/store/useMacroStore";
 
 export default function ChatBotScreen() {
   const [prompt, setPrompt] = useState("");
@@ -23,7 +25,8 @@ export default function ChatBotScreen() {
     sugar: number;
   }>(null);
   const [invalidInput, setInvalid] = useState("");
-  const { macros, addMacros, clearMacros } = useMacroStore();
+  const [currentMeals, setMeals] = useState(mealApi.fetchMeals()); 
+  // const { macros, addMacros, clearMacros } = useMacroStore();
 
   const handleSend = async () => {
     if (!prompt.trim()) return;
@@ -32,23 +35,12 @@ export default function ChatBotScreen() {
     setInvalid("");
 
     try {
-      const res = await fetch(`http://${BASE_URL}:3000/api/bot/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setInvalid(data.error);
-        throw new Error(data.error || "Unknown backend error");
-      }
-
+      const data = await botApi.sendPrompt(prompt); 
       console.log(data);
-      addMacros(data);
+      // addMacros(data);
       setNutrition(data);
-    } catch (error) {
-      console.log(invalidInput);
+    } catch (error: any) {
+      setInvalid(error.message || "Failed to fetch nutrition info");
       console.error("Error fetching nutrition:", error);
     } finally {
       setLoading(false);
@@ -105,7 +97,7 @@ export default function ChatBotScreen() {
         </View>
       )}
 
-      {macros && (
+      {/* {macros && (
         <View style={styles.resultBox}>
           <Text style={styles.resultText}>📊 Total Macros Consumed:</Text>
           <Text style={styles.resultText}>
@@ -122,7 +114,7 @@ export default function ChatBotScreen() {
             <Text style={styles.resetButtonText}>Reset Macros</Text>
           </TouchableOpacity>
         </View>
-      )}
+      )} */}
     </View>
   );
 }

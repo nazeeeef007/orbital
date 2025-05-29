@@ -11,6 +11,7 @@ import {
   Pressable,
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import { mealApi } from '@/apis/mealApi';
 import { BASE_URL } from '@/config';
 
 const Meals = () => {
@@ -21,20 +22,20 @@ const Meals = () => {
 
   const fetchMeals = async () => {
     try {
-      const token = await SecureStore.getItemAsync('authToken');
-      if (!token) {
-        alert('Authentication token not found. Please log in again.');
-        setLoading(false);
-        return;
-      }
+      // const token = await SecureStore.getItemAsync('authToken'); //Moved to api
+      // if (!token) {
+      //   alert('Authentication token not found. Please log in again.');
+      //   setLoading(false);
+      //   return;
+      // }
 
-      const response = await fetch(`http://${BASE_URL}:3000/api/meals`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // const response = await fetch(`http://${BASE_URL}:3000/api/meals`, {
+      //   headers: { Authorization: `Bearer ${token}` },
+      // });
 
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      // if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
-      const data = await response.json();
+      const data = await mealApi.fetchMeals();
       setMeals(data);
     } catch (err) {
       console.error('Failed to fetch meals:', err);
@@ -42,7 +43,7 @@ const Meals = () => {
       setLoading(false);
     }
   };
-
+  
   useEffect(() => {
     fetchMeals();
   }, []);
