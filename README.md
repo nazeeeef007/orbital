@@ -16,15 +16,13 @@ Before starting the app, you must configure the IP address and API keys in the f
    - Set your local machine's IP address so the app knows where to send requests:
      ```ts
      // config.ts
-     export const API_URL = "http://YOUR_IP_ADDRESS:PORT";
+     export const BASE_URL = "192.168.68.108";
      ```
 2. **Backend** (`backend/.env`)  
    - Add your IP address to allow CORS and define the server port:
      ```
      HOST=YOUR_IP_ADDRESS
-     PORT=YOUR_PORT
      ```
-
 3. **Bot Microservice** (`bot-microservice/.env`)  
    - Set your OpenAI API key and IP address:
      ```
