@@ -36,7 +36,7 @@ ipconfig
 ```
 Look for the `IPV4` value Example:
 ```
-inet 192.168.1.42
+192.168.1.42
 ```
 Use that IP address in the config files.
 
