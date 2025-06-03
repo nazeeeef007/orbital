@@ -1,4 +1,5 @@
 // src/apis/botApi.ts
+import * as SecureStore from 'expo-secure-store';
 import { BASE_URL } from '@/config';
 
 export const botApi = {
