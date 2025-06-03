@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -12,6 +13,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { botApi } from "@/apis/botApi";
 import { mealApi } from "@/apis/mealApi";
 import { BASE_URL } from "@/config";
+import { Meal } from "@/types/meal";
+import TodayMeals from "./components/todayMeals";
 // import { useMacroStore } from "@/store/useMacroStore";
 
 export default function ChatBotScreen() {
@@ -25,9 +28,21 @@ export default function ChatBotScreen() {
     sugar: number;
   }>(null);
   const [invalidInput, setInvalid] = useState("");
-  const [currentMeals, setMeals] = useState(mealApi.fetchMeals()); 
-  // const { macros, addMacros, clearMacros } = useMacroStore();
+  const [currentMeals, setMeals] = useState<Meal[]>([]);
 
+  useEffect(() => {
+    const fetchMeals = async () => {
+      try {
+        const meals = await mealApi.fetchMeals();
+        setMeals(meals);
+      } catch (err) {
+        console.error("Failed to fetch meals", err);
+      }
+    };
+    fetchMeals();
+  }, []);
+  // const { macros, addMacros, clearMacros } = useMacroStore();
+  
   const handleSend = async () => {
     if (!prompt.trim()) return;
     setLoading(true);
@@ -35,9 +50,9 @@ export default function ChatBotScreen() {
     setInvalid("");
 
     try {
-      const data = await botApi.sendPrompt(prompt); 
+      const data = await botApi.sendPrompt(prompt);
       console.log(data);
-      // addMacros(data);
+      // addMacros(data); //upload meal withoutImage,
       setNutrition(data);
     } catch (error: any) {
       setInvalid(error.message || "Failed to fetch nutrition info");
@@ -96,25 +111,9 @@ export default function ChatBotScreen() {
           <Text style={styles.resultText}>🍬 Sugar: {nutrition.sugar}g</Text>
         </View>
       )}
-
-      {/* {macros && (
-        <View style={styles.resultBox}>
-          <Text style={styles.resultText}>📊 Total Macros Consumed:</Text>
-          <Text style={styles.resultText}>
-            🔥 Calories: {macros.calories} kcal
-          </Text>
-          <Text style={styles.resultText}>
-            🍞 Carbs: {macros.carbohydrates}g
-          </Text>
-          <Text style={styles.resultText}>🍗 Protein: {macros.protein}g</Text>
-          <Text style={styles.resultText}>🥑 Fats: {macros.fat}g</Text>
-          <Text style={styles.resultText}>🍬 Sugars: {macros.sugar}g</Text>
-
-          <TouchableOpacity style={styles.resetButton} onPress={clearMacros}>
-            <Text style={styles.resetButtonText}>Reset Macros</Text>
-          </TouchableOpacity>
-        </View>
-      )} */}
+   <>
+      <TodayMeals meals={currentMeals}/>
+    </>
     </View>
   );
 }

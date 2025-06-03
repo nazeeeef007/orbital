@@ -1,5 +1,6 @@
-
-const supabase = require('../models/supabaseClient');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY)
 
 const signup = async (req, res) => {
   const { email, password } = req.body;
