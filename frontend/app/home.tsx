@@ -2,11 +2,38 @@ import React from "react";
 import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import * as SecureStore from 'expo-secure-store'; // ⬅️ add this at the top
+import axios from "axios";
+import { BASE_URL } from "@/config";
+
 
 export default function HomeScreen() {
   const router = useRouter();
 
-  const handleLogout = () => router.replace("/login");
+  const handleLogout = async () => {
+    try {
+      const token = await SecureStore.getItemAsync("authToken");
+      if (!token) throw new Error("No token found");
+
+      // Call backend to invalidate session
+      await axios.post(`http://${BASE_URL}:3000/api/auth/logout`, null, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // Clear local token AFTER backend confirms
+      console.log("logging out token: ", token)
+      await SecureStore.deleteItemAsync("authToken");
+      
+      console.log(await SecureStore.getItemAsync("authToken"));
+      // Navigate to login
+      router.replace("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
   const handleViewMeals = () => router.push("/meal");
   const handleUpload = () => router.push("/upload");
   const handleStartChat = () => router.push("/chatBot");

@@ -6,6 +6,7 @@ import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 import * as Progress from 'react-native-progress';
 import { BASE_URL } from '@/config';
+// import MacroGraph from "../components/MacroGraph";
 
 const Profile = () => {
   const theme = useTheme();
@@ -29,6 +30,8 @@ const Profile = () => {
   const [avatar, setAvatar] = useState(null);
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState(null);
+  const [macroHistory, setMacroHistory] = useState([]);
+
 
   useEffect(() => {
     const initialize = async () => {
@@ -65,6 +68,11 @@ const Profile = () => {
 
         setAvatar(data.avatar_url || null);
         // console.log(data.avatar_url);
+        const historyRes = await axios.get(`http://${BASE_URL}:3000/api/macro/history`, {
+          headers: { Authorization: `Bearer ${storedToken}` },
+        });
+
+        setMacroHistory(historyRes.data.data || []);
       } catch (err) {
         Alert.alert('Error', 'Failed to load profile');
       }
@@ -193,6 +201,11 @@ const Profile = () => {
       <TextInput label="Protein Goal (g)" value={form.protein_goal} onChangeText={(text) => handleChange('protein_goal', text.replace(/[^0-9]/g, ''))} keyboardType="numeric" style={styles.input} />
       <TextInput label="Carbs Goal (g)" value={form.carbs_goal} onChangeText={(text) => handleChange('carbs_goal', text.replace(/[^0-9]/g, ''))} keyboardType="numeric" style={styles.input} />
       <TextInput label="Fat Goal (g)" value={form.fat_goal} onChangeText={(text) => handleChange('fat_goal', text.replace(/[^0-9]/g, ''))} keyboardType="numeric" style={styles.input} />
+
+      {/* <View>
+      <Text style={[styles.sectionHeader, { color: theme.colors.primary }]}>7-Day Macro Trend</Text>
+      <MacroGraph data={macroHistory} />
+    </View> */}
 
       <Button mode="contained" onPress={handleSubmit} loading={loading} disabled={loading} style={{ marginTop: 20 }}>
         Save Profile

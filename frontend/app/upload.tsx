@@ -9,9 +9,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   Image,
-} from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+} from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
 import { BASE_URL } from "@/config";
 import { Ionicons } from "@expo/vector-icons";
 import { mealApi } from "@/apis/mealApi";
@@ -20,11 +20,11 @@ export default function UploadScreen() {
   const router = useRouter();
   const [mealImage, setMealImage] = useState(null);
   const [recipeImage, setRecipeImage] = useState(null);
-  const [recipeText, setRecipeText] = useState("");
-  const [calories, setCalories] = useState("");
-  const [protein, setProtein] = useState("");
-  const [carbs, setCarbs] = useState("");
-  const [fat, setFat] = useState("");
+  const [recipeText, setRecipeText] = useState('');
+  const [calories, setCalories] = useState('');
+  const [protein, setProtein] = useState('');
+  const [carbs, setCarbs] = useState('');
+  const [fat, setFat] = useState('');
   const [loading, setLoading] = useState(false);
 
   const pickImage = async (setImageFn: any) => {
@@ -38,22 +38,56 @@ export default function UploadScreen() {
     }
   };
 
-  const handleUpload = async () => {
+  const uploadMeal = async () => {
     if (!recipeText || !mealImage || !calories || !protein || !carbs || !fat) {
-      alert("Please fill in all required fields and upload meal image.");
+      alert('Please fill in all required fields and upload meal image.');
       return;
     }
 
+    if (!useAI && (!calories || !protein || !carbs || !fat)) {
+      alert('Please fill in all macros for manual upload.');
+      return;
+    }
+    console.log("ok");
+
     setLoading(true);
     try {
-      await mealApi.uploadMeal({
-        mealImage,
-        recipeImage,
-        recipeText,
-        calories,
-        protein,
-        carbs,
-        fat,
+      const token = await SecureStore.getItemAsync('authToken');
+      console.log(token);
+      if (!token) {
+        alert('Authentication token not found. Please log in again.');
+        setLoading(false);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('meal_image', {
+        uri: mealImage.uri,
+        name: 'meal.jpg',
+        type: 'image/jpeg',
+      });
+
+      if (recipeImage) {
+        formData.append('recipe_image', {
+          uri: recipeImage.uri,
+          name: 'recipe.jpg',
+          type: 'image/jpeg',
+        });
+      }
+
+      formData.append('recipe_text', recipeText);
+      formData.append('calories', calories);
+      formData.append('protein', protein);
+      formData.append('carbs', carbs);
+      formData.append('fat', fat);
+
+      const response = await fetch(`http://${BASE_URL}:3000/api/upload/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+        body: formData,
       });
 
       alert("Meal uploaded successfully!");
@@ -82,16 +116,28 @@ export default function UploadScreen() {
     </TouchableOpacity>
   );
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Upload Meal</Text>
+   return (
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: '#fff' }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0} // adjust offset if needed
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.title}>Upload Meal</Text>
 
-      {renderImageBox(mealImage, "Tap to add Meal Image *", setMealImage)}
-      {renderImageBox(
-        recipeImage,
-        "Tap to add Recipe Image (optional)",
-        setRecipeImage
-      )}
+          {/* Toggle for AI */}
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Use AI to analyze meal</Text>
+            <Switch value={useAI} onValueChange={setUseAI} />
+          </View>
+
+      {renderImageBox(mealImage, 'Tap to add Meal Image *', setMealImage)}
+      {renderImageBox(recipeImage, 'Tap to add Recipe Image (optional)', setRecipeImage)}
 
       <TextInput
         placeholder="Recipe description *"
@@ -100,60 +146,28 @@ export default function UploadScreen() {
         multiline
         style={styles.input}
       />
-      <TextInput
-        placeholder="Calories *"
-        keyboardType="numeric"
-        value={calories}
-        onChangeText={setCalories}
-        style={styles.input}
-      />
-      <TextInput
-        placeholder="Protein *"
-        keyboardType="numeric"
-        value={protein}
-        onChangeText={setProtein}
-        style={styles.input}
-      />
-      <TextInput
-        placeholder="Carbs *"
-        keyboardType="numeric"
-        value={carbs}
-        onChangeText={setCarbs}
-        style={styles.input}
-      />
-      <TextInput
-        placeholder="Fat *"
-        keyboardType="numeric"
-        value={fat}
-        onChangeText={setFat}
-        style={styles.input}
-      />
+      <TextInput placeholder="Calories *" keyboardType="numeric" value={calories} onChangeText={setCalories} style={styles.input} />
+      <TextInput placeholder="Protein *" keyboardType="numeric" value={protein} onChangeText={setProtein} style={styles.input} />
+      <TextInput placeholder="Carbs *" keyboardType="numeric" value={carbs} onChangeText={setCarbs} style={styles.input} />
+      <TextInput placeholder="Fat *" keyboardType="numeric" value={fat} onChangeText={setFat} style={styles.input} />
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={handleUpload}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Upload Meal</Text>
-        )}
+      <TouchableOpacity style={styles.button} onPress={uploadMeal} disabled={loading}>
+        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Upload Meal</Text>}
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, flex: 1, backgroundColor: "#fff" },
-  title: { fontSize: 28, fontWeight: "bold", marginBottom: 20, color: "#333" },
+  container: { padding: 20, flex: 1, backgroundColor: '#fff' },
+  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 20, color: '#333' },
   input: {
     borderWidth: 1,
     borderColor: "#ccc",
     padding: 12,
     marginBottom: 12,
     borderRadius: 10,
-    backgroundColor: "#f9f9f9",
+    backgroundColor: '#f9f9f9',
   },
   button: {
     backgroundColor: "#4f46e5",
@@ -186,5 +200,15 @@ const styles = StyleSheet.create({
     color: "#888",
     marginTop: 8,
     fontSize: 14,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  switchLabel: {
+    fontSize: 16,
+    color: '#333',
   },
 });

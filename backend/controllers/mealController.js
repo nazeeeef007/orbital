@@ -1,9 +1,10 @@
-const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY)
+const supabase = require('../models/supabaseClient');
 
 const getUserMeals = async (req, res) => {
   const userId = req.user.id;
+
+  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
   console.log("getting User Meals!");
   const { data, error } = await supabase
     .from('meals')
@@ -15,7 +16,10 @@ const getUserMeals = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 
+  console.log(`User ${userId} has ${data.length} meal(s).`);
   res.json(data);
 };
 
-module.exports = { getUserMeals };
+module.exports = {
+  getUserMeals
+};

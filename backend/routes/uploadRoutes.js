@@ -15,4 +15,14 @@ router.post(
   uploadController.uploadMeal
 );
 
+router.post(
+  '/uploadAi',
+  authenticate,
+  upload.fields([
+    { name: 'meal_image', maxCount: 1 },
+    { name: 'recipe_image', maxCount: 1 }
+  ]),
+  uploadController.uploadMealAi
+);
+
 module.exports = router;

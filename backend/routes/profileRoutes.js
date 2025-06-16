@@ -5,6 +5,7 @@ const { authenticate } = require('../middleware/authMiddleware');
 const upload = require('../middleware/multerMiddleware'); // multer for avatar upload
 const profileController = require('../controllers/profileController');
 
+
 router.put(
   '/profile',
   authenticate,

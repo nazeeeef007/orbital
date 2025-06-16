@@ -1,4 +1,3 @@
-// app/auth/login.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -9,11 +8,12 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AuthTextInput from '../components/AuthTextInput';
-import * as SecureStore from 'expo-secure-store'; // ⬅️ add this at the top
-import { BASE_URL } from "@/config";
+import * as SecureStore from 'expo-secure-store';
+import { BASE_URL } from '@/config';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -40,7 +40,6 @@ export default function LoginScreen() {
       setLoading(false);
 
       if (!response.ok) {
-        // More detailed error handling based on API response
         if (data.error === 'Invalid email') {
           setMessage({ type: 'error', text: 'Email address not found.' });
         } else if (data.error === 'Invalid password') {
@@ -49,25 +48,19 @@ export default function LoginScreen() {
           setMessage({ type: 'error', text: data.error || 'Login failed. Please check your credentials.' });
         }
       } else {
-        const { session, user } = data.data;
-
-
+        const { session } = data.data;
         if (!session || !session.access_token) {
           setMessage({ type: 'error', text: 'Login failed: token missing.' });
           return;
         }
-        
-        if (Platform.OS !== 'web') {
-          await SecureStore.setItemAsync('authToken', session.access_token); //Dont work on web
-        }
-
+        await SecureStore.setItemAsync('authToken', session.access_token); // ✅ Correct method
         console.log(session.access_token);
         setMessage({ type: 'success', text: 'Login successful! Redirecting...' });
         setTimeout(() => {
           router.replace('/home');
-        }, 1000)
+        }, 1000);
       }
-    } catch (err: any) {
+    } catch (err) {
       setLoading(false);
       setMessage({ type: 'error', text: 'Network error. Please try again later.' });
       console.error(err);
@@ -79,7 +72,10 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.select({ ios: 'padding', android: undefined })}
     >
-      <Text style={styles.title}>Login</Text>
+      <View style={styles.logoContainer}>
+        <Text style={styles.logoText}>NutriScan</Text>
+        <Text style={styles.tagline}>Your personalized nutrition tracker</Text>
+      </View>
 
       <AuthTextInput
         placeholder="Email"
@@ -128,36 +124,44 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 24,
     justifyContent: 'center',
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#f5f6fa',
   },
-  title: {
-    fontSize: 32,
+  logoContainer: {
+    marginBottom: 40,
+    alignItems: 'center',
+  },
+  logoText: {
+    fontSize: 36,
     fontWeight: 'bold',
-    marginBottom: 30,
-    color: '#111827',
-    textAlign: 'center',
+    color: '#4f46e5',
+    letterSpacing: 1,
+  },
+  tagline: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 6,
   },
   button: {
     marginTop: 24,
     backgroundColor: '#4f46e5',
     paddingVertical: 16,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
     shadowColor: '#4f46e5',
     shadowOpacity: 0.4,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
   },
   buttonDisabled: {
-    backgroundColor: '#a5a0f8',
+    backgroundColor: '#a5b4fc',
   },
   buttonText: {
     color: '#fff',
     fontWeight: '700',
-    fontSize: 20,
+    fontSize: 18,
   },
   link: {
-    marginTop: 18,
+    marginTop: 20,
     color: '#4f46e5',
     textAlign: 'center',
     fontWeight: '600',

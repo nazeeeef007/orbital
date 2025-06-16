@@ -48,7 +48,29 @@ const login = async (req, res) => {
   res.status(200).json({ message: 'User logged in successfully', data });
 };
 
+const logout = async (req, res) => {
+  const token = req.headers['authorization']?.split(' ')[1];
+
+  if (!token) return res.status(400).json({ error: 'No token provided' });
+
+  try {
+    // Supabase does not have a backend signOut, but you can revoke the token:
+    const { error } = await supabase.auth.admin.signOut(token);
+
+    if (error) {
+      console.error('Logout failed:', error.message);
+      return res.status(500).json({ error: 'Failed to log out' });
+    }
+
+    return res.status(200).json({ message: 'Logged out successfully' });
+  } catch (err) {
+    console.error('Unexpected error during logout:', err);
+    return res.status(500).json({ error: 'Unexpected error during logout' });
+  }
+};
+
 module.exports = {
   signup,
   login,
+  logout
 };
