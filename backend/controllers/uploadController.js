@@ -1,4 +1,7 @@
-const supabase = require('../models/supabaseClient');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY)
+
 const path = require('path');
 
 const { OpenAI } = require('openai');
@@ -24,7 +27,8 @@ exports.uploadMealAi= async (req, res) => {
     // Call OpenAI to get macro estimation from recipe_text
     const context = `You are a nutrition expert specialized in Singaporean food. 
 Given a meal description that may include the dish name, ingredients, and their weights, 
-estimate the total macros: 'calories' (kcal), 'carbohydrates', 'protein', 'fat' (grams). 
+estimate the total macros: 'calories' (kcal), 'carbohydrates', 'protein', 'fat' (grams).
+also give me  
 Respond ONLY with a JSON object containing these keys with integer values. 
 If the input is unclear or not food-related, respond with an error message in JSON.`;
 

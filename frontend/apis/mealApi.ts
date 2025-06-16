@@ -9,7 +9,7 @@ export const mealApi = {
       throw new Error('Authentication token not found');
     }
 
-    const response = await fetch(`http://${BASE_URL}:3000/api/meals`, {
+    const response = await fetch(`${BASE_URL}/api/meals`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -67,7 +67,7 @@ export const mealApi = {
     formData.append('carbs', carbs);
     formData.append('fat', fat);
 
-    const response = await fetch(`http://${BASE_URL}:3000/api/upload/upload`, {
+    const response = await fetch(`${BASE_URL}/api/upload/upload`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,

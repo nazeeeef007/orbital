@@ -16,7 +16,7 @@ export default function HomeScreen() {
       if (!token) throw new Error("No token found");
 
       // Call backend to invalidate session
-      await axios.post(`http://${BASE_URL}:3000/api/auth/logout`, null, {
+      await axios.post(`${BASE_URL}/api/auth/logout`, null, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -65,13 +65,6 @@ export default function HomeScreen() {
           <Text style={styles.buttonText}>Start Chat</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.outlineButton}
-          onPress={handleViewMeals}
-        >
-          <Ionicons name="restaurant-outline" size={20} color="#7c3aed" />
-          <Text style={styles.outlineText}>View Meals</Text>
-        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.outlineButton}

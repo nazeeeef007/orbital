@@ -4,7 +4,7 @@ import { BASE_URL } from '@/config';
 
 export const botApi = {
   sendPrompt: async (prompt: string) => {
-    const res = await fetch(`http://${BASE_URL}:3000/api/bot/chat`, {
+    const res = await fetch(`${BASE_URL}/api/bot/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt }),
