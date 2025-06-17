@@ -299,7 +299,7 @@ const recommendationHandler = async (req, res) => {
     highlyScoredMeals.sort((a, b) => b.score - a.score);
 
     const topMeals = highlyScoredMeals.slice(0, 20);
-
+    // console.log(topMeals);
     return res.status(200).json({ recommendations: topMeals });
   } catch (err) {
     console.error('Recommendation error:', err);

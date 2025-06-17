@@ -112,7 +112,7 @@ If the input is unclear or not food-related, respond with an error message in JS
         .getPublicUrl(recipeImagePath).data.publicUrl;
     }
 
-    console.log("Uploading meal with estimated macros...");
+    console.log("Uploading meal with estimated macros...", " userId:" , userId);
 
     // Insert into meals table with macros from OpenAI
     const { calories, protein, carbohydrates, fat } = macros;

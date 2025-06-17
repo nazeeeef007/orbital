@@ -9,12 +9,14 @@ import {
   ActivityIndicator,
   Alert,
   StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { BASE_URL } from '@/config';
-import SearchResultCard from '../../components/searchResult'; // Your existing SearchResultCard
-import { Ionicons } from '@expo/vector-icons'; // For search icon and filter icon
-import RecommendationScreen from '../components/recommendationScreen'; // Import the new component
+import SearchResultCard from '../../components/searchResult';
+import RecommendationScreen from '../components/recommendationScreen';
+import { Ionicons } from '@expo/vector-icons';
 
 let debounceTimer: NodeJS.Timeout;
 
@@ -23,24 +25,27 @@ export default function SearchScreen() {
   const [type, setType] = useState<'meals' | 'users'>('meals');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-
-  // Use a state to track if a search was explicitly performed (query is not empty)
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Debounced search effect
+  // DEBUG LOG: Track query and hasSearched
+  console.log('SearchScreen rendered. query:', `"${query}"`, 'hasSearched:', hasSearched);
+
+
   useEffect(() => {
     if (!query.trim()) {
-      setResults([]); // Clear results when query is empty
-      setHasSearched(false); // No active search
-      clearTimeout(debounceTimer); // Clear any pending debounces
+      console.log('SearchScreen useEffect: Query is empty. Setting hasSearched to false.'); // DEBUG LOG
+      setResults([]);
+      setHasSearched(false);
+      clearTimeout(debounceTimer);
       return;
     }
 
-    setHasSearched(true); // User has entered a query
+    console.log('SearchScreen useEffect: Query is NOT empty. Setting hasSearched to true.'); // DEBUG LOG
+    setHasSearched(true);
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       dynamicSearch();
-    }, 500); // 500ms debounce
+    }, 500);
   }, [query, type]);
 
   const dynamicSearch = useCallback(async () => {
@@ -61,87 +66,106 @@ export default function SearchScreen() {
         }
       );
 
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Failed to perform search.');
+      }
+
       const data = await res.json();
       setResults(data.results || []);
     } catch (err) {
       console.error('Search failed:', err);
       Alert.alert('Search Failed', 'Could not perform search. Please try again.');
+      setResults([]);
     } finally {
       setLoading(false);
     }
-  }, [query, type]); // Dependencies for useCallback
+  }, [query, type]);
 
   return (
-    <View style={styles.container}>
-      {/* Search Input Bar */}
-      <View style={styles.searchBarWrapper}>
-        <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
-        <TextInput
-          placeholder="Search users or meals..."
-          value={query}
-          onChangeText={setQuery}
-          style={styles.input}
-          placeholderTextColor="#888"
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
-        {query.length > 0 && ( // Show clear button if query is not empty
-          <TouchableOpacity onPress={() => setQuery('')} style={styles.clearButton}>
-            <Ionicons name="close-circle" size={20} color="#888" />
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
+      <View style={styles.container}>
+        {/* Search Input Bar */}
+        <View style={styles.searchBarWrapper}>
+          <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
+          <TextInput
+            placeholder="Search users or meals..."
+            value={query}
+            onChangeText={setQuery}
+            style={styles.input}
+            placeholderTextColor="#888"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {query.length > 0 && (
+            <TouchableOpacity onPress={() => setQuery('')} style={styles.clearButton}>
+              <Ionicons name="close-circle" size={20} color="#888" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Toggle Buttons */}
+        <View style={styles.toggleContainer}>
+          <TouchableOpacity
+            style={[styles.toggleButton, type === 'users' && styles.activeButton]}
+            onPress={() => setType('users')}
+          >
+            <Text style={[styles.toggleText, type === 'users' && styles.activeButtonText]}>Users</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.toggleButton, type === 'meals' && styles.activeButton]}
+            onPress={() => setType('meals')}
+          >
+            <Text style={[styles.toggleText, type === 'meals' && styles.activeButtonText]}>Meals</Text>
+          </TouchableOpacity>
+        </View>
+
+        {loading && hasSearched && <ActivityIndicator size="large" color="#FE2C55" style={styles.loader} />}
+
+        {/* Conditionally render RecommendationScreen or Search Results */}
+        {!hasSearched ? (
+          <>
+            {console.log('Rendering RecommendationScreen')} {/* DEBUG LOG */}
+            <RecommendationScreen />
+          </>
+        ) : (
+          <>
+            {console.log('Rendering Search Results FlatList')} {/* DEBUG LOG */}
+            <FlatList
+              data={results}
+              keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+              renderItem={({ item }) => <SearchResultCard item={item} type={type} />}
+              ListEmptyComponent={
+                !loading && query.trim().length > 0 && results.length === 0 ? (
+                  <View style={styles.centeredMessage}>
+                    <Ionicons name="compass-outline" size={48} color="#888" />
+                    <Text style={styles.emptyText}>No results found for "{query}".</Text>
+                    <Text style={styles.emptySubText}>Try a different query or switch type.</Text>
+                  </View>
+                ) : null
+              }
+              contentContainerStyle={{ paddingBottom: 100 }}
+              showsVerticalScrollIndicator={false}
+              style={styles.resultsList}
+            />
+          </>
         )}
       </View>
-
-      {/* Toggle Buttons */}
-      <View style={styles.toggleContainer}>
-        <TouchableOpacity
-          style={[styles.toggleButton, type === 'users' && styles.activeButton]}
-          onPress={() => setType('users')}
-        >
-          <Text style={[styles.toggleText, type === 'users' && styles.activeButtonText]}>Users</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.toggleButton, type === 'meals' && styles.activeButton]}
-          onPress={() => setType('meals')}
-        >
-          <Text style={[styles.toggleText, type === 'meals' && styles.activeButtonText]}>Meals</Text>
-        </TouchableOpacity>
-      </View>
-
-      {loading && <ActivityIndicator size="large" color="#FE2C55" style={styles.loader} />}
-
-      {/* Conditionally render RecommendationScreen or Search Results */}
-      {!hasSearched ? ( // If no search query is active
-        <RecommendationScreen />
-      ) : (
-        // Display search results if a query is active
-        <FlatList
-          data={results}
-          keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
-          renderItem={({ item }) => <SearchResultCard item={item} type={type} />}
-          ListEmptyComponent={
-            !loading && query.trim().length > 0 && results.length === 0 ? (
-              <View style={styles.centeredMessage}>
-                <Ionicons name="compass-outline" size={48} color="#888" />
-                <Text style={styles.emptyText}>No results found for "{query}".</Text>
-                <Text style={styles.emptySubText}>Try a different query or switch type.</Text>
-              </View>
-            ) : null
-          }
-          contentContainerStyle={{ paddingBottom: 100 }}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  // ... (unchanged styles)
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#F5F5F5', // Light background for the screen
+    backgroundColor: '#F5F5F5',
   },
   searchBarWrapper: {
     flexDirection: 'row',
@@ -149,10 +173,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
     paddingHorizontal: 12,
-    marginBottom: 15, // Increased margin
+    marginBottom: 15,
     borderWidth: 1,
     borderColor: '#E0E0E0',
-    shadowColor: '#000', // Subtle shadow
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 3,
@@ -163,7 +187,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    height: 48, // Consistent height for input
+    height: 48,
     fontSize: 16,
     color: '#333',
   },
@@ -173,12 +197,12 @@ const styles = StyleSheet.create({
   },
   toggleContainer: {
     flexDirection: 'row',
-    backgroundColor: '#EAEAEA', // Light grey background for toggle
+    backgroundColor: '#EAEAEA',
     borderRadius: 10,
-    marginBottom: 20, // Increased margin
+    marginBottom: 20,
     overflow: 'hidden',
-    alignSelf: 'center', // Center the toggle bar
-    width: '90%', // Make it slightly narrower than full width
+    alignSelf: 'center',
+    width: '90%',
   },
   toggleButton: {
     flex: 1,
@@ -186,23 +210,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   activeButton: {
-    backgroundColor: '#FE2C55', // Vibrant accent color
-    borderRadius: 8, // Rounded corners for active segment
-    margin: 4, // Little spacing for the active button within the container
+    backgroundColor: '#FE2C55',
+    borderRadius: 8,
+    margin: 4,
   },
   toggleText: {
-    color: '#555', // Default text color for inactive
+    color: '#555',
     fontWeight: '600',
     fontSize: 15,
   },
   activeButtonText: {
-    color: 'white', // White text for active button
+    color: 'white',
   },
   loader: {
     marginVertical: 20,
   },
   centeredMessage: {
-    flex: 1, // Allow it to take available space
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 50,
@@ -219,5 +243,8 @@ const styles = StyleSheet.create({
     marginTop: 5,
     color: '#A0A0A0',
     fontSize: 14,
+  },
+  resultsList: {
+    flex: 1,
   },
 });

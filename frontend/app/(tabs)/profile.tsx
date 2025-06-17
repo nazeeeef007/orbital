@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react'; // Import useCallback
 import {
   View,
   Alert,
@@ -6,16 +6,16 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
-  SafeAreaView, // Use SafeAreaView for better layout on notched devices
+  SafeAreaView,
+  RefreshControl, // Import RefreshControl
 } from 'react-native';
 import { Avatar, Button, TextInput, useTheme, Card, Title, Paragraph, Divider } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
-import * as Progress from 'react-native-progress'; // For macro progress circles
-import { Ionicons } from '@expo/vector-icons'; // For icons in buttons/sections
+import * as Progress from 'react-native-progress';
+import { Ionicons } from '@expo/vector-icons';
 import { BASE_URL } from '@/config';
-// import MacroGraph from "../components/MacroGraph"; // Uncomment if you use this
 
 const Profile = () => {
   const theme = useTheme();
@@ -40,56 +40,63 @@ const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [macroHistory, setMacroHistory] = useState([]);
-  const [isEditingGoals, setIsEditingGoals] = useState(false); // New state to toggle goal editing
+  const [isEditingGoals, setIsEditingGoals] = useState(false);
+  const [refreshing, setRefreshing] = useState(false); // New state for refreshing
+
+  // Wrap initialize logic in useCallback to prevent unnecessary re-creations
+  const initialize = useCallback(async () => {
+    setRefreshing(true); // Start refreshing indicator
+    try {
+      const storedToken = await SecureStore.getItemAsync('authToken');
+      if (!storedToken) {
+        Alert.alert('Authentication Error', 'No authentication token found. Please log in again.');
+        setRefreshing(false); // Stop refreshing if no token
+        return;
+      }
+      setToken(storedToken);
+
+      const profileRes = await axios.get(`${BASE_URL}/api/profile/me`, {
+        headers: { Authorization: `Bearer ${storedToken}` },
+      });
+
+      const data = profileRes.data;
+
+      setForm({
+        username: data.username || '',
+        display_name: data.display_name || '',
+        bio: data.bio || '',
+        location: data.location || '',
+        website: data.website || '',
+        daily_calories: data.daily_calories?.toString() || '0',
+        daily_protein: data.daily_protein?.toString() || '0',
+        daily_carbs: data.daily_carbs?.toString() || '0',
+        daily_fat: data.daily_fat?.toString() || '0',
+        calories_goal: data.calories_goal?.toString() || '0',
+        protein_goal: data.protein_goal?.toString() || '0',
+        carbs_goal: data.carbs_goal?.toString() || '0',
+        fat_goal: data.fat_goal?.toString() || '0',
+      });
+
+      setAvatar(data.avatar_url || null);
+
+      // Fetch macro history if needed for the graph
+      const historyRes = await axios.get(`${BASE_URL}/api/macro/history`, {
+        headers: { Authorization: `Bearer ${storedToken}` },
+      });
+      setMacroHistory(historyRes.data.data || []);
+
+    } catch (err) {
+      console.error("Failed to load profile:", err);
+      Alert.alert('Error', 'Failed to load profile data. Please try again later.');
+    } finally {
+      setRefreshing(false); // Stop refreshing indicator regardless of success or failure
+    }
+  }, []); // Empty dependency array as it only needs to be created once
 
   useEffect(() => {
-    const initialize = async () => {
-      try {
-        const storedToken = await SecureStore.getItemAsync('authToken');
-        if (!storedToken) {
-          Alert.alert('Authentication Error', 'No authentication token found. Please log in again.');
-          return;
-        }
-        setToken(storedToken);
-
-        const profileRes = await axios.get(`${BASE_URL}/api/profile/me`, {
-          headers: { Authorization: `Bearer ${storedToken}` },
-        });
-
-        const data = profileRes.data;
-
-        setForm({
-          username: data.username || '',
-          display_name: data.display_name || '',
-          bio: data.bio || '',
-          location: data.location || '',
-          website: data.website || '',
-          daily_calories: data.daily_calories?.toString() || '0',
-          daily_protein: data.daily_protein?.toString() || '0',
-          daily_carbs: data.daily_carbs?.toString() || '0',
-          daily_fat: data.daily_fat?.toString() || '0',
-          calories_goal: data.calories_goal?.toString() || '0',
-          protein_goal: data.protein_goal?.toString() || '0',
-          carbs_goal: data.carbs_goal?.toString() || '0',
-          fat_goal: data.fat_goal?.toString() || '0',
-        });
-
-        setAvatar(data.avatar_url || null);
-
-        // Fetch macro history if needed for the graph
-        const historyRes = await axios.get(`${BASE_URL}/api/macro/history`, {
-          headers: { Authorization: `Bearer ${storedToken}` },
-        });
-        setMacroHistory(historyRes.data.data || []);
-
-      } catch (err) {
-        console.error("Failed to load profile:", err);
-        Alert.alert('Error', 'Failed to load profile data. Please try again later.');
-      }
-    };
-
     initialize();
-  }, []);
+  }, [initialize]); // Depend on initialize now that it's wrapped in useCallback
+
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -124,7 +131,6 @@ const Profile = () => {
     try {
       const formData = new FormData();
       Object.entries(form).forEach(([key, val]) => {
-        // Only append non-empty values, except for numerical goals which can be '0'
         if (val !== null && val !== undefined && (val !== '' || key.includes('_goal') || key.includes('daily_'))) {
           formData.append(key, val);
         }
@@ -139,12 +145,10 @@ const Profile = () => {
           uri: avatar,
           name: filename || 'avatar.jpg',
           type,
-        } as any); // Type assertion needed for FormData.append with File
+        } as any);
       } else if (avatar === null) {
-         // If avatar is explicitly set to null, indicate to backend to clear it
-         formData.append('avatar', '');
+          formData.append('avatar', '');
       }
-
 
       await axios.put(`${BASE_URL}/api/profile/profile`, formData, {
         headers: {
@@ -155,6 +159,7 @@ const Profile = () => {
 
       Alert.alert('Success', 'Your profile has been updated successfully!');
       setIsEditingGoals(false); // Exit editing mode after saving
+      initialize(); // Re-fetch data after a successful save to ensure fresh values are displayed
     } catch (err: any) {
       console.error("Profile update failed:", err);
       Alert.alert('Error', err.response?.data?.error || 'Failed to update profile. Please check your input and try again.');
@@ -174,9 +179,9 @@ const Profile = () => {
           size={85}
           progress={progress}
           showsText
-          formatText={() => percentage + '%'} // Show percentage in the circle
+          formatText={() => percentage + '%'}
           color={color}
-          unfilledColor={theme.colors.backdrop} // Use theme's backdrop for consistency
+          unfilledColor={theme.colors.backdrop}
           borderWidth={0}
           strokeCap="round"
           textStyle={styles.progressText}
@@ -189,7 +194,16 @@ const Profile = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        refreshControl={ // Add RefreshControl here
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={initialize} // Call initialize on pull to refresh
+            tintColor={theme.colors.primary} // Color of the refresh indicator
+          />
+        }
+      >
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <TouchableOpacity onPress={pickImage} style={styles.avatarWrapper}>
@@ -213,7 +227,7 @@ const Profile = () => {
             />
             <TextInput
               label="Username"
-              value={`@${form.username}`} // Display with @ prefix
+              value={`@${form.username}`}
               onChangeText={(text) => handleChange('username', text.startsWith('@') ? text.substring(1) : text)}
               mode="flat"
               style={styles.infoInput}
@@ -312,7 +326,7 @@ const Profile = () => {
         */}
 
         {/* General Save Profile Button */}
-        {!isEditingGoals && ( // Hide this button when editing goals (as a separate save button is there)
+        {!isEditingGoals && (
           <Button mode="contained" onPress={handleSubmit} loading={loading} disabled={loading} style={styles.saveProfileButton}>
             {loading ? "Saving Profile..." : "Save All Changes"}
           </Button>
@@ -325,7 +339,7 @@ const Profile = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f8f8f8', // Light background for the whole screen
+    backgroundColor: '#f8f8f8',
   },
   container: {
     paddingHorizontal: 20,
@@ -342,13 +356,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatar: {
-    backgroundColor: '#e0e0e0', // Default background for avatar icon
+    backgroundColor: '#e0e0e0',
     borderWidth: 2,
-    borderColor: '#ddd', // Subtle border
+    borderColor: '#ddd',
   },
   changeAvatarText: {
     marginTop: 8,
-    color: '#007AFF', // A vibrant blue for actionable text
+    color: '#007AFF',
     fontSize: 13,
     fontWeight: '600',
   },
@@ -356,34 +370,34 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   infoInput: {
-    backgroundColor: 'transparent', // Make inputs transparent in header
+    backgroundColor: 'transparent',
     paddingHorizontal: 0,
-    height: 40, // Adjust height for a more compact look
+    height: 40,
     marginBottom: 5,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333', // Darker text for titles
+    color: '#333',
     marginBottom: 15,
     marginTop: 20,
   },
   input: {
     marginBottom: 15,
-    backgroundColor: '#fff', // White background for regular inputs
-    borderRadius: 8, // Slightly rounded corners for inputs
-    borderColor: '#e0e0e0', // Light border
-    borderWidth: 1, // Add border to TextInput
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderColor: '#e0e0e0',
+    borderWidth: 1,
   },
   macrosProgressContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-around', // Distribute items evenly
+    justifyContent: 'space-around',
     marginBottom: 20,
   },
   macroCard: {
     alignItems: 'center',
-    width: '46%', // Adjust width for two columns with spacing
+    width: '46%',
     marginBottom: 20,
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -392,7 +406,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3, // For Android shadow
+    elevation: 3,
   },
   progressText: {
     fontSize: 16,
@@ -412,7 +426,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     marginVertical: 20,
-    backgroundColor: '#e0e0e0', // Light grey divider
+    backgroundColor: '#e0e0e0',
   },
   goalsHeader: {
     flexDirection: 'row',
@@ -426,7 +440,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 8,
     borderRadius: 8,
-    backgroundColor: '#e9f4ff', // Light blue background for edit button
+    backgroundColor: '#e9f4ff',
   },
   editButtonText: {
     marginLeft: 5,
@@ -466,9 +480,9 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   saveProfileButton: {
-    marginTop: 30, // More spacing for the main save button
+    marginTop: 30,
     borderRadius: 10,
-    paddingVertical: 8, // Make button slightly taller
+    paddingVertical: 8,
   },
   graphCard: {
     marginBottom: 20,

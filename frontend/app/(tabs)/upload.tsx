@@ -147,7 +147,7 @@ export default function UploadScreen() {
       setFat('');
       setUseAI(false);
 
-      router.replace('/home'); // Navigate back to home or a confirmation screen
+      router.replace('/profile'); // Navigate back to home or a confirmation screen
     } catch (err: any) {
       console.error('Upload error:', err);
       Alert.alert('Upload Failed', err.message || 'An unexpected error occurred during upload. Please try again.');
