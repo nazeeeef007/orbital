@@ -99,92 +99,39 @@ const searchHandler = async (req, res) => {
 
 const recommendationHandler = async (req, res) => {
   const user_id = req.user?.id;
-  console.log("User ID from auth:", user_id);
-
   if (!user_id) {
     return res.status(401).json({ error: 'Authentication required or user ID missing' });
   }
 
   try {
-    console.log("Reached recommendation for user:", user_id);
-
-    // 1️⃣ Get user profile with all relevant goals
+    // 1️⃣ Fetch user profile
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('calories_goal, protein_goal, carbs_goal, fat_goal, daily_calories, daily_protein, daily_carbs, daily_fat, daily_updated_at')
       .eq('id', user_id)
       .single();
 
-    if (profileError || !profile) {
-      console.warn('Profile fetch warning:', profileError?.message || 'Profile not found.');
-      // If profile is crucial for certain scores, you might want to adjust how
-      // recommendations are generated or provide a default if it's missing.
-    }
+    if (profileError || !profile) console.warn('Profile fetch warning:', profileError?.message || 'Profile not found.');
 
-    // 2️⃣ Get recent meals eaten by this user (expanded fields)
-    const { data: userMeals, error: userMealsError } = await supabase
+    // 2️⃣ Recent meals
+    const { data: userMeals = [] } = await supabase
       .from('meals')
       .select('cuisine, meal_time, course_type, diet_type, spice_level, calories, protein, carbs, fat, prep_time_mins, serving_size, created_at')
       .eq('user_id', user_id)
       .order('created_at', { ascending: false })
-      .limit(20); // Increased limit to capture more recent trends
+      .limit(20);
 
-    // 3️⃣ Get user's recent search history
-    const { data: searchHistory, error: searchHistoryError } = await supabase
+    // 3️⃣ Search history
+    const { data: searchHistory = [] } = await supabase
       .from('search_history')
       .select('query, search_type')
       .eq('user_id', user_id)
       .order('created_at', { ascending: false })
-      .limit(10); // Get recent search queries
+      .limit(10);
 
-    // 4️⃣ Get user's daily macro history for recent consumption
-    const { data: dailyMacroHistory, error: dailyMacroHistoryError } = await supabase
-      .from('daily_macro_history')
-      .select('date, calories, protein, carbs, fat')
-      .eq('user_id', user_id) // Assuming daily_macro_history also has user_id
-      .order('date', { ascending: false })
-      .limit(7); // Get last 7 days of macro history
-
-    // Prepare preference maps for meal attributes
-    const prefs = {
-      cuisine: {},
-      meal_time: {},
-      course_type: {},
-      diet_type: {},
-      spice_level: {},
-      prep_time_mins_ranges: { // Group prep times for preferences
-        'short': 0, 'medium': 0, 'long': 0
-      },
-      serving_size: {}
-    };
-
-    // Build frequency maps for meal attributes from userMeals
-    for (const meal of userMeals || []) {
-      for (const field of ['cuisine', 'meal_time', 'course_type', 'diet_type', 'spice_level', 'serving_size']) {
-        const val = meal[field];
-        if (val) prefs[field][val] = (prefs[field][val] || 0) + 1;
-      }
-      // Process prep_time_mins into ranges
-      if (meal.prep_time_mins != null) {
-        if (meal.prep_time_mins <= 20) prefs.prep_time_mins_ranges.short++;
-        else if (meal.prep_time_mins <= 45) prefs.prep_time_mins_ranges.medium++;
-        else prefs.prep_time_mins_ranges.long++;
-      }
-    }
-
-    // Extract keywords from search history
-    const searchKeywords = new Set();
-    for (const entry of searchHistory || []) {
-      if (entry.query && entry.search_type === 'meals') {
-        entry.query.toLowerCase().split(/\s+/).forEach(term => {
-          if (term.length > 2) searchKeywords.add(term); // Only add meaningful terms
-        });
-      }
-    }
-
-    // Calculate current daily remaining macros (if profile has current day's data)
+    // 4️⃣ Remaining macros
+    const today = new Date().toISOString().split('T')[0];
     let remainingDailyMacros = null;
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     if (profile && profile.daily_updated_at === today) {
       remainingDailyMacros = {
         calories: Math.max(0, (profile.calories_goal || 0) - (profile.daily_calories || 0)),
@@ -192,120 +139,189 @@ const recommendationHandler = async (req, res) => {
         carbs: Math.max(0, (profile.carbs_goal || 0) - (profile.daily_carbs || 0)),
         fat: Math.max(0, (profile.fat_goal || 0) - (profile.daily_fat || 0)),
       };
-      console.log("Remaining daily macros:", remainingDailyMacros);
-    } else {
-        console.log("Daily macros not updated for today or profile missing. Cannot use remaining macros for scoring.");
     }
 
+    // 5️⃣ Preference frequency maps
+    const prefs = {
+      cuisine: {}, meal_time: {}, course_type: {}, diet_type: {}, spice_level: {}, serving_size: {},
+      prep_time_mins_ranges: { short: 0, medium: 0, long: 0 }
+    };
 
-    // 5️⃣ Get all meals from DB
-    const { data: allMeals, error: allMealsError } = await supabase
+    for (const meal of userMeals) {
+      ['cuisine', 'meal_time', 'course_type', 'diet_type', 'spice_level', 'serving_size'].forEach(field => {
+        const val = meal[field];
+        if (val) prefs[field][val] = (prefs[field][val] || 0) + 1;
+      });
+      if (meal.prep_time_mins != null) {
+        if (meal.prep_time_mins <= 20) prefs.prep_time_mins_ranges.short++;
+        else if (meal.prep_time_mins <= 45) prefs.prep_time_mins_ranges.medium++;
+        else prefs.prep_time_mins_ranges.long++;
+      }
+    }
+
+    // 6️⃣ Search keyword extraction
+    const searchKeywords = new Set();
+    for (const entry of searchHistory) {
+      if (entry.query && entry.search_type === 'meals') {
+        entry.query.toLowerCase().split(/\s+/).forEach(word => {
+          if (word.length > 2) searchKeywords.add(word);
+        });
+      }
+    }
+
+    // 7️⃣ Get all meals
+    const { data: allMealsRaw = [], error: allMealsError } = await supabase
       .from('meals')
-      .select('id, recipe_text, meal_image_url, calories, protein, carbs, fat, created_at, cuisine, meal_time, course_type, diet_type, spice_level, prep_time_mins, serving_size');
+      .select(`
+        id, recipe_text, meal_image_url, calories, protein, carbs, fat, created_at,
+        cuisine, meal_time, course_type, diet_type, spice_level, prep_time_mins, serving_size,
+        meal_likes(count), meal_comments(count), meal_saves(count)
+      `);
 
     if (allMealsError) {
-      console.error('Meal fetch error:', allMealsError.message);
       return res.status(500).json({ error: 'Failed to fetch meals' });
     }
 
-    const scoredMeals = allMeals.map(meal => {
+    // 8️⃣ Liked/saved meals
+    const { data: likedMeals = [] } = await supabase
+      .from('meal_likes')
+      .select('meal_id')
+      .eq('user_id', user_id);
+
+    const { data: savedMeals = [] } = await supabase
+      .from('meal_saves')
+      .select('meal_id')
+      .eq('user_id', user_id);
+
+    const likedMealIds = new Set(likedMeals.map(m => m.meal_id));
+    const savedMealIds = new Set(savedMeals.map(m => m.meal_id));
+
+    const scoredMeals = [];
+
+    // 9️⃣ Scoring meals
+    for (const meal of allMealsRaw) {
       let score = 0;
 
-      // WEIGHTS (adjust these to fine-tune your algorithm)
-      const WEIGHT_NUTRITIONAL_FIT = 50;
-      const WEIGHT_PREFERENCE_MATCH = 15;
-      const WEIGHT_RECENT_MEAL_MACRO_CLOSENESS = 20; // New weight
-      const WEIGHT_SEARCH_KEYWORD_MATCH = 10;
-      const WEIGHT_PREP_TIME_FIT = 5;
-      const WEIGHT_SERVING_SIZE_FIT = 5;
-      const WEIGHT_RECENCY = 2; // For newer meals
+      const W = {
+        NUTRITIONAL_FIT: 50, PREFERENCE_MATCH: 15, RECENT_MACRO_CLOSENESS: 20,
+        SEARCH_KEYWORD_MATCH: 10, PREP_TIME_FIT: 5, SERVING_SIZE_FIT: 5,
+        RECENCY: 2, LIKES: 5, COMMENTS: 3, SAVES: 7
+      };
 
-      // 💪 1. Nutritional closeness to goals (from profile goals)
+      ['calories', 'protein', 'carbs', 'fat'].forEach(field => {
+        meal[field] = parseFloat(meal[field]) || 0;
+      });
+
+      const likesCount = meal.meal_likes?.[0]?.count || 0;
+      const commentsCount = meal.meal_comments?.[0]?.count || 0;
+      const savesCount = meal.meal_saves?.[0]?.count || 0;
+
+      score += likesCount * W.LIKES + commentsCount * W.COMMENTS + savesCount * W.SAVES;
+
+      // Nutritional fit
       if (profile) {
-        const macros = ['calories', 'protein', 'carbs', 'fat'];
-        for (const macro of macros) {
+        for (const macro of ['calories', 'protein', 'carbs', 'fat']) {
           const goal = profile[`${macro}_goal`];
-          const mealValue = meal[macro];
-          if (goal != null && mealValue != null) {
-            // Calculate a score based on how close the meal's macro is to the user's goal
-            // Using a simple inverse relationship to difference for scoring
-            const diff = Math.abs(goal - mealValue);
-            // Smaller difference gets higher score. Scale to max WEIGHT_NUTRITIONAL_FIT.
-            // Example: 0 diff = WEIGHT_NUTRITIONAL_FIT, large diff = 0
-            score += Math.max(0, WEIGHT_NUTRITIONAL_FIT * (1 - (diff / goal))); // Avoid division by zero for goal
+          const val = meal[macro];
+          if (goal != null && val != null) {
+            const diff = Math.abs(goal - val);
+            score += Math.max(0, W.NUTRITIONAL_FIT * (1 - (diff / (goal || 1))));
           }
         }
       }
 
-      // 🎯 2. Nutritional closeness to *remaining* daily macros (if available for today)
+      // Remaining daily macro closeness
       if (remainingDailyMacros) {
-        const macros = ['calories', 'protein', 'carbs', 'fat'];
-        for (const macro of macros) {
+        for (const macro of ['calories', 'protein', 'carbs', 'fat']) {
           const remaining = remainingDailyMacros[macro];
-          const mealValue = meal[macro];
-          if (remaining != null && mealValue != null) {
-            // Reward meals that help meet remaining goals without overshooting too much
-            const diff = Math.abs(remaining - mealValue);
-            score += Math.max(0, WEIGHT_RECENT_MEAL_MACRO_CLOSENESS * (1 - (diff / (remaining + mealValue)))); // Normalize by sum to prevent huge differences from dominating
+          const val = meal[macro];
+          if (remaining != null && val != null) {
+            const diff = Math.abs(remaining - val);
+            score += Math.max(0, W.RECENT_MACRO_CLOSENESS * (1 - (diff / (remaining + val + 1))));
           }
         }
       }
 
-      // 🍛 3. Preference similarity from past meals
-      for (const field of ['cuisine', 'meal_time', 'course_type', 'diet_type', 'spice_level', 'serving_size']) {
+      // Preference match
+      ['cuisine', 'meal_time', 'course_type', 'diet_type', 'spice_level', 'serving_size'].forEach(field => {
         const val = meal[field];
         if (val && prefs[field][val]) {
-          score += prefs[field][val] * WEIGHT_PREFERENCE_MATCH; // Weight by frequency in user's history
+          score += prefs[field][val] * W.PREFERENCE_MATCH;
         }
-      }
+      });
 
-      // ⏱️ 4. Prep time preference
+      // Prep time
       if (meal.prep_time_mins != null) {
-        let mealPrepRange = '';
-        if (meal.prep_time_mins <= 20) mealPrepRange = 'short';
-        else if (meal.prep_time_mins <= 45) mealPrepRange = 'medium';
-        else mealPrepRange = 'long';
-
-        if (prefs.prep_time_mins_ranges[mealPrepRange]) {
-          score += prefs.prep_time_mins_ranges[mealPrepRange] * WEIGHT_PREP_TIME_FIT;
+        const prepRange = meal.prep_time_mins <= 20 ? 'short' : meal.prep_time_mins <= 45 ? 'medium' : 'long';
+        if (prefs.prep_time_mins_ranges[prepRange]) {
+          score += prefs.prep_time_mins_ranges[prepRange] * W.PREP_TIME_FIT;
         }
       }
 
-      // 🔍 5. Search keyword matching
-      const recipeTextLower = meal.recipe_text?.toLowerCase() || '';
-      for (const keyword of searchKeywords) {
-        if (recipeTextLower.includes(keyword)) {
-          score += WEIGHT_SEARCH_KEYWORD_MATCH;
+      // Search keywords
+      const recipeLower = meal.recipe_text?.toLowerCase() || '';
+      for (const kw of searchKeywords) {
+        if (recipeLower.includes(kw)) {
+          score += W.SEARCH_KEYWORD_MATCH;
         }
       }
 
-      // 🆕 6. Recency of meal creation (bias towards newer meals uploaded by anyone)
+      // Recency
       if (meal.created_at) {
-        const mealDate = new Date(meal.created_at);
-        const now = new Date();
-        const daysAgo = (now.getTime() - mealDate.getTime()) / (1000 * 60 * 60 * 24);
-        // Reward newer meals, penalize older ones, e.g., max score for < 7 days, then decays
-        score += Math.max(0, WEIGHT_RECENCY * (10 - Math.min(daysAgo, 10))); // decays over 10 days
+        const daysAgo = (new Date() - new Date(meal.created_at)) / (1000 * 60 * 60 * 24);
+        score += Math.max(0, W.RECENCY * (10 - Math.min(daysAgo, 10)));
       }
 
-      // Ensure score doesn't go negative, though with additions it's unlikely
-      return { ...meal, score: Math.max(0, score) };
-    });
+      // 🔒 Fetch comments with null-safe fallback
+      let comments = [];
+      try {
+        const { data: fetchedComments, error: commentErr } = await supabase
+          .from('meal_comments')
+          .select('content, created_at, user_id, profiles(username)')
+          .eq('meal_id', meal.id)
+          .order('created_at', { ascending: false });
 
-    // Filter out meals with zero score (not relevant at all)
-    const highlyScoredMeals = scoredMeals.filter(meal => meal.score > 0);
+        if (commentErr) {
+          console.warn(`Failed to fetch comments for meal ${meal.id}:`, commentErr.message);
+        }
 
-    // 🔽 Sort by score
-    highlyScoredMeals.sort((a, b) => b.score - a.score);
+        if (Array.isArray(fetchedComments)) {
+          comments = fetchedComments.map(c => ({
+            content: c.content,
+            created_at: c.created_at,
+            user_id: c.user_id,
+            username: c.profiles?.username || 'Unknown'
+          }));
+        }
+      } catch (err) {
+        console.warn(`Error while processing comments for meal ${meal.id}:`, err.message);
+      }
 
-    const topMeals = highlyScoredMeals.slice(0, 20);
-    // console.log(topMeals);
+      scoredMeals.push({
+        ...meal,
+        score: Math.max(0, score),
+        likesCount,
+        comments,
+        savesCount,
+        isLikedByCurrentUser: likedMealIds.has(meal.id),
+        isSavedByCurrentUser: savedMealIds.has(meal.id)
+      });
+    }
+
+    // 🔟 Return sorted recommendations
+    const topMeals = scoredMeals
+      .filter(m => m.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 20);
+
     return res.status(200).json({ recommendations: topMeals });
+
   } catch (err) {
     console.error('Recommendation error:', err);
     return res.status(500).json({ error: 'Unexpected server error while generating recommendations' });
   }
 };
+
 
 module.exports = {
   searchHandler,
