@@ -10,25 +10,22 @@ const openai = new OpenAI({
 });
 
 
-exports.uploadMealAi= async (req, res) => {
+exports.uploadMealAi = async (req, res) => {
   try {
     const { recipe_text } = req.body;
     const mealImage = req.files['meal_image']?.[0];
-    const recipeImage = req.files['recipe_image']?.[0];
-    console.log(recipe_text);
-    console.log(mealImage);
+
     if (!recipe_text || !mealImage) {
       return res.status(400).json({ error: 'Missing required fields: recipe_text and meal_image are required' });
     }
 
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: 'User not authenticated' });
+    console.log("analysing with ai!");
 
-    // Call OpenAI to get macro estimation from recipe_text
     const context = `You are a nutrition expert specialized in Singaporean food. 
 Given a meal description that may include the dish name, ingredients, and their weights, 
 estimate the total macros: 'calories' (kcal), 'carbohydrates', 'protein', 'fat' (grams).
-also give me  
 Respond ONLY with a JSON object containing these keys with integer values. 
 If the input is unclear or not food-related, respond with an error message in JSON.`;
 
@@ -43,148 +40,68 @@ If the input is unclear or not food-related, respond with an error message in JS
       temperature: 0.3,
     });
 
-    
     const answer = response.choices[0].message.content.trim();
-    // Parse OpenAI JSON response
     let macros;
     try {
       macros = JSON.parse(answer);
     } catch (e) {
-      console.log("Failed to parse JSON from AI response:", answer);
-      return res.status(422).json({
-        error: "AI response is not valid JSON. Possibly input unclear.",
-        rawResponse: answer,
-      });
+      return res.status(422).json({ error: "AI response is not valid JSON.", rawResponse: answer });
     }
 
-    // Validate macro keys and integer values
     const expectedKeys = ["calories", "carbohydrates", "protein", "fat"];
     const missingKeys = expectedKeys.filter(k => !(k in macros));
     if (missingKeys.length > 0) {
-      return res.status(422).json({
-        error: `Missing macro keys in AI response: ${missingKeys.join(", ")}`,
-        data: macros,
-      });
+      return res.status(422).json({ error: `Missing keys: ${missingKeys.join(", ")}`, data: macros });
     }
 
     const invalidKeys = expectedKeys.filter(k => !Number.isInteger(macros[k]));
     if (invalidKeys.length > 0) {
-      return res.status(422).json({
-        error: `Invalid macro values (not integers) for keys: ${invalidKeys.join(", ")}`,
-        data: macros,
-      });
+      return res.status(422).json({ error: `Invalid macro values for: ${invalidKeys.join(", ")}`, data: macros });
     }
-
-    // Upload meal image to Supabase Storage
-    const mealImageExt = path.extname(mealImage.originalname);
-    const mealImagePath = `meals/${userId}/${Date.now()}-meal${mealImageExt}`;
-
-    const { error: mealUploadError } = await supabase.storage
-      .from('meal-images')
-      .upload(mealImagePath, mealImage.buffer, {
-        contentType: mealImage.mimetype,
-        upsert: true,
-      });
-
-    if (mealUploadError) throw mealUploadError;
-
-    const mealImageUrl = supabase.storage
-      .from('meal-images')
-      .getPublicUrl(mealImagePath).data.publicUrl;
-
-    // Upload recipe image if present
-    let recipeImageUrl = null;
-    if (recipeImage) {
-      const recipeImageExt = path.extname(recipeImage.originalname);
-      const recipeImagePath = `recipes/${userId}/${Date.now()}-recipe${recipeImageExt}`;
-
-      const { error: recipeUploadError } = await supabase.storage
-        .from('recipe-images')
-        .upload(recipeImagePath, recipeImage.buffer, {
-          contentType: recipeImage.mimetype,
-          upsert: true,
-        });
-
-      if (recipeUploadError) throw recipeUploadError;
-
-      recipeImageUrl = supabase.storage
-        .from('recipe-images')
-        .getPublicUrl(recipeImagePath).data.publicUrl;
-    }
-
-    console.log("Uploading meal with estimated macros...", " userId:" , userId);
-
-    // Insert into meals table with macros from OpenAI
-    const { calories, protein, carbohydrates, fat } = macros;
-
-    const { error: dbError } = await supabase.from('meals').insert([{
-      user_id: userId,
-      recipe_text,
-      calories,
-      protein,
-      carbs: carbohydrates,
-      fat,
-      meal_image_url: mealImageUrl,
-      recipe_image_url: recipeImageUrl,
-      created_at: new Date().toISOString(),
-    }]);
-
-    if (dbError) throw dbError;
-
-    // Update user's profile values
-    const { data: profile, error: profileFetchError } = await supabase
-      .from('profiles')
-      .select('daily_calories, daily_protein, daily_carbs, daily_fat')
-      .eq('id', userId)
-      .single();
-
-    if (profileFetchError) throw profileFetchError;
-
-    const updatedProfile = {
-      daily_calories: (profile.daily_calories || 0) + calories,
-      daily_protein: (profile.daily_protein || 0) + protein,
-      daily_carbs: (profile.daily_carbs || 0) + carbohydrates,
-      daily_fat: (profile.daily_fat || 0) + fat,
-      daily_updated_at: new Date().toISOString(),
-    };
-
-    const { error: profileUpdateError } = await supabase
-      .from('profiles')
-      .update(updatedProfile)
-      .eq('id', userId);
-
-    if (profileUpdateError) throw profileUpdateError;
-
-    return res.status(200).json({
-      message: 'Meal uploaded and profile updated successfully!',
-      macros,
-      meal_image_url: mealImageUrl,
-      recipe_image_url: recipeImageUrl,
-    });
-
+    console.log(macros);
+    return res.status(200).json({ macros }); // No DB insert
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('AI Macro Estimation Error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
 
+
+
 exports.uploadMeal = async (req, res) => {
   try {
-    const { recipe_text, calories, protein, carbs, fat } = req.body;
+    const {
+      recipe_text, calories, protein, carbs, fat,
+      cuisine, meal_time, diet_type, spice_level,
+      prep_time_mins, price, location
+    } = req.body;
+
     const mealImage = req.files['meal_image']?.[0];
     const recipeImage = req.files['recipe_image']?.[0];
 
-    if (!recipe_text || !calories || !protein || !carbs || !fat || !mealImage) {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'User not authenticated' });
+
+    // Validation
+    if (!recipe_text || !calories || !protein || !carbs || !fat || !mealImage ||
+        !cuisine || !meal_time || !diet_type || !spice_level) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: 'User not authenticated' });
-    
-    // Upload meal image to Supabase Storage
-    const mealImageExt = path.extname(mealImage.originalname);
-    const mealImagePath = `meals/${userId}/${Date.now()}-meal${mealImageExt}`;
+    const isHomecooked = price === '0' && location === 'Homecooked';
 
+    if (isHomecooked) {
+      if (!prep_time_mins || isNaN(prep_time_mins)) {
+        return res.status(400).json({ error: 'prep_time_mins is required for homecooked meals' });
+      }
+    } else {
+      if (!price || !location) {
+        return res.status(400).json({ error: 'price and location are required for non-homecooked meals' });
+      }
+    }
+
+    // Upload meal image
+    const mealImagePath = `meals/${userId}/${Date.now()}-meal${path.extname(mealImage.originalname)}`;
     const { error: mealUploadError } = await supabase.storage
       .from('meal-images')
       .upload(mealImagePath, mealImage.buffer, {
@@ -198,12 +115,10 @@ exports.uploadMeal = async (req, res) => {
       .from('meal-images')
       .getPublicUrl(mealImagePath).data.publicUrl;
 
-    // Upload recipe image if present
+    // Optional recipe image
     let recipeImageUrl = null;
     if (recipeImage) {
-      const recipeImageExt = path.extname(recipeImage.originalname);
-      const recipeImagePath = `recipes/${userId}/${Date.now()}-recipe${recipeImageExt}`;
-
+      const recipeImagePath = `recipes/${userId}/${Date.now()}-recipe${path.extname(recipeImage.originalname)}`;
       const { error: recipeUploadError } = await supabase.storage
         .from('recipe-images')
         .upload(recipeImagePath, recipeImage.buffer, {
@@ -217,13 +132,15 @@ exports.uploadMeal = async (req, res) => {
         .from('recipe-images')
         .getPublicUrl(recipeImagePath).data.publicUrl;
     }
-    console.log("uploading meal..");
-    // Insert into meals table
+
     const parsedCalories = parseFloat(calories);
     const parsedProtein = parseFloat(protein);
     const parsedCarbs = parseFloat(carbs);
     const parsedFat = parseFloat(fat);
+    const parsedPrice = parseFloat(price);
+    const parsedPrepTime = prep_time_mins ? parseInt(prep_time_mins) : null;
 
+    // Insert into DB
     const { error: dbError } = await supabase.from('meals').insert([{
       user_id: userId,
       recipe_text,
@@ -234,11 +151,18 @@ exports.uploadMeal = async (req, res) => {
       meal_image_url: mealImageUrl,
       recipe_image_url: recipeImageUrl,
       created_at: new Date().toISOString(),
+      cuisine,
+      meal_time,
+      diet_type,
+      spice_level,
+      prep_time_mins: isHomecooked ? parsedPrepTime : 0,
+      price: isHomecooked ? 0 : parsedPrice,
+      location: isHomecooked ? '' : location,
     }]);
 
     if (dbError) throw dbError;
 
-    // Update user's profile values
+    // Update profile
     const { data: profile, error: profileFetchError } = await supabase
       .from('profiles')
       .select('daily_calories, daily_protein, daily_carbs, daily_fat')
@@ -258,10 +182,9 @@ exports.uploadMeal = async (req, res) => {
     const { error: profileUpdateError } = await supabase
       .from('profiles')
       .update(updatedProfile)
-      .eq('id', userId); // Must match your RLS policy
+      .eq('id', userId);
 
     if (profileUpdateError) throw profileUpdateError;
-
 
     return res.status(200).json({ message: 'Meal uploaded and profile updated successfully!' });
   } catch (error) {
@@ -269,3 +192,4 @@ exports.uploadMeal = async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
+

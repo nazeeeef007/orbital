@@ -74,6 +74,71 @@ const getUserMeals = async (req, res) => {
     res.json(enrichedMeals);
 };
 
+const getMealById = async (req, res) => {
+  const mealId = req.params.id;
+  const userId = req.user?.id; // From authentication middleware
+
+  if (!mealId) {
+    return res.status(400).json({ error: 'Meal ID is required' });
+  }
+
+  // 1. Fetch the meal
+  const { data: meal, error: mealError } = await supabase
+    .from('meals')
+    .select('*')
+    .eq('id', mealId)
+    .single();
+
+  if (mealError || !meal) {
+    return res.status(404).json({ error: mealError?.message || 'Meal not found' });
+  }
+
+  // 2. Fetch metadata in parallel
+  const [{ count: likesCount }, { count: savesCount }, { data: comments }, { data: userLike }, { data: userSave }] = await Promise.all([
+    supabase
+      .from('meal_likes')
+      .select('id', { count: 'exact', head: true })
+      .eq('meal_id', mealId),
+
+    supabase
+      .from('meal_saves')
+      .select('id', { count: 'exact', head: true })
+      .eq('meal_id', mealId),
+
+    supabase
+      .from('meal_comments')
+      .select('content, created_at, user_id')
+      .eq('meal_id', mealId)
+      .order('created_at', { ascending: false }),
+
+    supabase
+      .from('meal_likes')
+      .select('id')
+      .eq('meal_id', mealId)
+      .eq('user_id', userId)
+      .maybeSingle(),
+
+    supabase
+      .from('meal_saves')
+      .select('id')
+      .eq('meal_id', mealId)
+      .eq('user_id', userId)
+      .maybeSingle(),
+  ]);
+
+  const enrichedMeal = {
+    ...meal,
+    likesCount: likesCount || 0,
+    savesCount: savesCount || 0,
+    comments: comments || [],
+    commentsCount: comments?.length || 0,
+    isLikedByCurrentUser: !!userLike,
+    isSavedByCurrentUser: !!userSave,
+  };
+
+  res.json(enrichedMeal);
+};
+
 // Like a meal
 const likeMeal = async (req, res) => {
     // Get user_id from the authenticated token via middleware
@@ -123,34 +188,38 @@ const commentMeal = async (req, res) => {
     res.json({ success: true });
 };
 
-// Get all comments for a meal
 const getMealComments = async (req, res) => {
-    const { meal_id } = req.params;
-    const { data, error } = await supabase
-        .from('meal_comments')
-        .select(`
-            content,
-            created_at,
-            user_id,
-            profiles(username) // Join with profiles table to get username
-        `)
-        .eq('meal_id', meal_id)
-        .order('created_at', { ascending: false });
+  const { meal_id } = req.params;
 
-    if (error) {
-        console.error('Error fetching meal comments:', error.message);
-        return res.status(500).json({ error: error.message });
-    }
+  const { data, error } = await supabase
+    .from('meal_comments')
+    .select(`
+      content,
+      created_at,
+      user_id,
+      profiles (
+        username,
+        avatar_url
+      )
+    `)
+    .eq('meal_id', meal_id)
+    .order('created_at', { ascending: false });
 
-    // Map the data to flatten the profile username
-    const commentsWithUsernames = data.map(comment => ({
-        content: comment.content,
-        created_at: comment.created_at,
-        user_id: comment.user_id, // Keep user_id for potential future use
-        username: comment.profiles ? comment.profiles.username : 'Unknown User', // Extract username
-    }));
+  if (error) {
+    console.error('Error fetching meal comments:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
 
-    res.json(commentsWithUsernames);
+  // Map the data to flatten the joined profile info
+  const commentsWithUserInfo = data.map(comment => ({
+    content: comment.content,
+    created_at: comment.created_at,
+    user_id: comment.user_id,
+    username: comment.profiles?.username || 'Unknown User',
+    avatar_url: comment.profiles?.avatar_url || null,
+  }));
+
+  res.json(commentsWithUserInfo);
 };
 
 // Save a meal
@@ -196,5 +265,6 @@ module.exports = {
     commentMeal,
     getMealComments,
     saveMeal,
-    unsaveMeal
+    unsaveMeal,
+    getMealById
 };
