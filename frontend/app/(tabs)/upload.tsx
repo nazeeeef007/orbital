@@ -146,49 +146,50 @@ export default function UploadScreen() {
 
     setLoading(true);
     try {
-      const token = await SecureStore.getItemAsync('authToken');
-      if (!token) {
-        Alert.alert('Authentication Error', 'You are not logged in. Please log in again.');
-        router.replace('/login');
-        return;
-      }
+      const response = await fetch(mealImage.uri);
+      const imageBlob = await response.blob();
+      const reader = new FileReader();
 
-      const formData = new FormData();
-      formData.append('meal_image', {
-        uri: mealImage.uri,
-        name: `meal_${Date.now()}.jpg`,
-        type: 'image/jpeg',
-      } as any);
-      formData.append('recipe_text', recipeText);
+      reader.onloadend = async () => {
+        const base64 = reader.result?.toString().split(',')[1];
+        const dataUri = `data:image/jpeg;base64,${base64}`;
 
-      const response = await fetch(`${BASE_URL}/api/upload/uploadAi`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
-      });
+        const backendRes = await fetch(`${BASE_URL}/api/bot/image`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: dataUri,
+            description: recipeText || 'No description provided',
+          }),
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to analyze meal with AI.');
-      }
+        const data = await backendRes.json();
 
-      const { macros } = await response.json();
-      setCalories(macros.calories ? String(Math.round(macros.calories)) : '');
-      setProtein(macros.protein ? String(Math.round(macros.protein)) : '');
-      setCarbs(macros.carbohydrates ? String(Math.round(macros.carbohydrates)) : '');
-      setFat(macros.fat ? String(Math.round(macros.fat)) : '');
+        if (!backendRes.ok) {
+          throw new Error(data.error || 'AI analysis failed');
+        }
 
-      Alert.alert('AI Analysis Complete', 'Macro nutrients have been pre-filled. Please review and adjust if needed.');
+        const macros = data.macros;
+        setCalories(String(macros.calories || ''));
+        setProtein(String(macros.protein || ''));
+        setCarbs(String(macros.carbs || macros.carbohydrates || ''));
+        setFat(String(macros.fat || ''));
 
+        setCuisine(data.cuisine || '');
+        setMealTime(data.meal_time || '');
+
+        Alert.alert('AI Analysis Complete', 'Macros updated based on image.');
+      };
+
+      reader.readAsDataURL(imageBlob);
     } catch (err: any) {
       console.error('AI analysis error:', err);
-      Alert.alert('AI Analysis Failed', err.message || 'An unexpected error occurred during AI analysis. Please try again.');
+      Alert.alert('AI Analysis Failed', err.message || 'Unexpected error.');
     } finally {
       setLoading(false);
     }
   };
+
 
   /**
    * Handles the submission of the meal data. Performs validation and sends data to the API.

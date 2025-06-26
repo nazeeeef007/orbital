@@ -13,8 +13,8 @@ const macroRoutes = require('./routes/macroRoutes');
 
 app.use(cors({ origin: '*', credentials: true }));
 // app.options('*', cors());
+app.use(express.json({ limit: '2mb' }));
 
-app.use(express.json());
 app.use('/api/auth',     authRoutes);
 app.use('/api/profile',  profileRoutes);
 app.use('/api/bot', botRoutes);
