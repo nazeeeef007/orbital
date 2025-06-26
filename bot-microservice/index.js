@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { OpenAI } = require('openai');
+const { OpenAI, RateLimitError } = require('openai');
 const { sendChat } = require('./controllers/sendChatController');
 const { sendImage } = require('./controllers/sendImageController');
 
@@ -14,7 +14,7 @@ const openai = new OpenAI({
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
 app.use((req, res, next) => {
   req.openai = openai;
