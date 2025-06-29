@@ -4,67 +4,67 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 
 const path = require('path');
 
-const { OpenAI } = require('openai');
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// const { OpenAI } = require('openai');
+// const openai = new OpenAI({
+//   apiKey: process.env.OPENAI_API_KEY
+// });
 
 
-exports.uploadMealAi = async (req, res) => {
-  try {
-    const { recipe_text } = req.body;
-    const mealImage = req.files['meal_image']?.[0];
+// exports.uploadMealAi = async (req, res) => {
+//   try {
+//     const { recipe_text } = req.body;
+//     const mealImage = req.files['meal_image']?.[0];
 
-    if (!recipe_text || !mealImage) {
-      return res.status(400).json({ error: 'Missing required fields: recipe_text and meal_image are required' });
-    }
+//     if (!recipe_text || !mealImage) {
+//       return res.status(400).json({ error: 'Missing required fields: recipe_text and meal_image are required' });
+//     }
 
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: 'User not authenticated' });
-    console.log("analysing with ai!");
+//     const userId = req.user?.id;
+//     if (!userId) return res.status(401).json({ error: 'User not authenticated' });
+//     console.log("analysing with ai!");
 
-    const context = `You are a nutrition expert specialized in Singaporean food. 
-Given a meal description that may include the dish name, ingredients, and their weights, 
-estimate the total macros: 'calories' (kcal), 'carbohydrates', 'protein', 'fat' (grams).
-Respond ONLY with a JSON object containing these keys with integer values. 
-If the input is unclear or not food-related, respond with an error message in JSON.`;
+//     const context = `You are a nutrition expert specialized in Singaporean food. 
+// Given a meal description that may include the dish name, ingredients, and their weights, 
+// estimate the total macros: 'calories' (kcal), 'carbohydrates', 'protein', 'fat' (grams).
+// Respond ONLY with a JSON object containing these keys with integer values. 
+// If the input is unclear or not food-related, respond with an error message in JSON.`;
 
-    const messages = [
-      { role: "system", content: context },
-      { role: "user", content: recipe_text },
-    ];
+//     const messages = [
+//       { role: "system", content: context },
+//       { role: "user", content: recipe_text },
+//     ];
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      messages,
-      temperature: 0.3,
-    });
+//     const response = await openai.chat.completions.create({
+//       model: "gpt-4.1-mini",
+//       messages,
+//       temperature: 0.3,
+//     });
 
-    const answer = response.choices[0].message.content.trim();
-    let macros;
-    try {
-      macros = JSON.parse(answer);
-    } catch (e) {
-      return res.status(422).json({ error: "AI response is not valid JSON.", rawResponse: answer });
-    }
+//     const answer = response.choices[0].message.content.trim();
+//     let macros;
+//     try {
+//       macros = JSON.parse(answer);
+//     } catch (e) {
+//       return res.status(422).json({ error: "AI response is not valid JSON.", rawResponse: answer });
+//     }
 
-    const expectedKeys = ["calories", "carbohydrates", "protein", "fat"];
-    const missingKeys = expectedKeys.filter(k => !(k in macros));
-    if (missingKeys.length > 0) {
-      return res.status(422).json({ error: `Missing keys: ${missingKeys.join(", ")}`, data: macros });
-    }
+//     const expectedKeys = ["calories", "carbohydrates", "protein", "fat"];
+//     const missingKeys = expectedKeys.filter(k => !(k in macros));
+//     if (missingKeys.length > 0) {
+//       return res.status(422).json({ error: `Missing keys: ${missingKeys.join(", ")}`, data: macros });
+//     }
 
-    const invalidKeys = expectedKeys.filter(k => !Number.isInteger(macros[k]));
-    if (invalidKeys.length > 0) {
-      return res.status(422).json({ error: `Invalid macro values for: ${invalidKeys.join(", ")}`, data: macros });
-    }
-    console.log(macros);
-    return res.status(200).json({ macros }); // No DB insert
-  } catch (error) {
-    console.error('AI Macro Estimation Error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-};
+//     const invalidKeys = expectedKeys.filter(k => !Number.isInteger(macros[k]));
+//     if (invalidKeys.length > 0) {
+//       return res.status(422).json({ error: `Invalid macro values for: ${invalidKeys.join(", ")}`, data: macros });
+//     }
+//     console.log(macros);
+//     return res.status(200).json({ macros }); // No DB insert
+//   } catch (error) {
+//     console.error('AI Macro Estimation Error:', error);
+//     return res.status(500).json({ error: 'Internal server error' });
+//   }
+// };
 
 
 
