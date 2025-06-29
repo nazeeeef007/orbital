@@ -56,4 +56,4 @@ const sendChat = async (req, res) => {
   }
 };
 
-export { sendChat };
+module.exports = { sendChat };
