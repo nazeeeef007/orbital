@@ -16,7 +16,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.nutriTrack.front"
     },
     "web": {
       "bundler": "metro",
@@ -41,7 +42,11 @@
     },
     "extra": {
       "SUPABASE_URL": "https://cpivmuwyrprskdpaivcq.supabase.co",
-      "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwaXZtdXd5cnByc2tkcGFpdmNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxMTQ5MTMsImV4cCI6MjA2MjY5MDkxM30.juBCy97UFz6P-bEKwIhJGhWQiqbGljQRpEtx7e9hmuc"
+      "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwaXZtdXd5cnByc2tkcGFpdmNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxMTQ5MTMsImV4cCI6MjA2MjY5MDkxM30.juBCy97UFz6P-bEKwIhJGhWQiqbGljQRpEtx7e9hmuc",
+      "router": {},
+      "eas": {
+        "projectId": "2eba4b53-1604-4a6b-9b44-4f5fa0736ece"
+      }
     }
   }
 }
