@@ -3,7 +3,7 @@ import { Stack, Redirect, usePathname } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { ActivityIndicator, View, StyleSheet, Text } from 'react-native'; // Added Text for loading message
-
+import { AuthProvider } from '../hooks/useAuth';
 export default function RootLayout() {
   const pathname = usePathname();
   const [authToken, setAuthToken] = useState<string | null>(null);
@@ -50,6 +50,7 @@ export default function RootLayout() {
 
   // Render the main stack navigator for your application
   return (
+    <AuthProvider>
     <Stack>
       {/* The 'login' and 'signup' screens are designed to be standalone,
           so their headers are hidden. */}
@@ -67,6 +68,7 @@ export default function RootLayout() {
           <Stack.Screen name="detailScreen" options={{ headerTitle: 'Meal Details' }} />
           <Stack.Screen name="settings" options={{ headerTitle: 'Settings' }} /> */}
     </Stack>
+    </AuthProvider>
   );
 }
 

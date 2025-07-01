@@ -1,5 +1,5 @@
 // components/CustomDropdown.tsx
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Modal,
   View,
@@ -11,8 +11,24 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
+  Animated, // Import Animated for smoother transitions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+// Define a light and dark color palette for better contrast and modern feel
+const Colors = {
+  primary: '#4f46e5', // A vibrant blue-purple for key elements
+  secondary: '#8b5cf6', // A lighter purple for accents
+  textPrimary: '#333333', // Dark text for readability
+  textSecondary: '#666666', // Muted text for descriptions/placeholders
+  border: '#E0E0E0', // Light grey for borders
+  background: '#FFFFFF', // White background for cards/modal
+  overlay: 'rgba(0,0,0,0.4)', // Slightly darker overlay for better focus
+  selectedBg: '#eef2ff', // Very light blue for selected item background (matches primary color family)
+  selectedText: '#4f46e5', // Primary color for selected text
+  success: '#16a34a', // Green for success indicators
+  placeholder: '#A0A0A0', // Clear placeholder color
+};
 
 interface DropdownItem {
   label: string;
@@ -20,15 +36,14 @@ interface DropdownItem {
 }
 
 interface CustomDropdownProps {
-  label: string;
+  label?: string; // Made label optional
   placeholder: string;
   options: DropdownItem[];
-  selectedValue: string | number;
+  selectedValue: string | number | null; // Allow null for no selection
   onValueChange: (value: string | number) => void;
-  // Optional: Add a style prop for external customization if needed
   style?: object;
-  // Optional: Allow icon customization
   icon?: keyof typeof Ionicons.glyphMap;
+  disabled?: boolean; // Added disabled prop
 }
 
 const screenHeight = Dimensions.get('window').height;
@@ -39,40 +54,85 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
   options,
   selectedValue,
   onValueChange,
-  style, // Destructure style prop
-  icon = 'chevron-down', // Default icon
+  style,
+  icon = 'chevron-down',
+  disabled = false, // Default to not disabled
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [dropdownTop, setDropdownTop] = useState(0);
   const [dropdownWidth, setDropdownWidth] = useState(0);
   const [dropdownLeft, setDropdownLeft] = useState(0);
   const triggerRef = useRef<TouchableOpacity>(null);
+  const opacityAnim = useRef(new Animated.Value(0)).current; // For modal opacity animation
+  const scaleAnim = useRef(new Animated.Value(0.95)).current; // For modal scale animation
 
-  // Recalculate position when modal visibility or screen dimensions change
-  useEffect(() => {
-    if (modalVisible) {
-      triggerRef.current?.measure((_fx, _fy, _w, h, px, py) => {
-        setDropdownTop(py + h + (Platform.OS === 'ios' ? 4 : 6)); // Adjusted slight offset
-        setDropdownWidth(_w);
-        setDropdownLeft(px);
-      });
-    }
-  }, [modalVisible, Dimensions.get('window').width, Dimensions.get('window').height]); // Added dimensions as dependency
-
-  const openDropdown = () => {
-    Keyboard.dismiss(); // Dismiss keyboard when dropdown opens
-
+  // Function to calculate and set dropdown position
+  const calculateDropdownPosition = useCallback(() => {
     triggerRef.current?.measure((_fx, _fy, _w, h, px, py) => {
-      setDropdownTop(py + h + (Platform.OS === 'ios' ? 4 : 6)); // Adjusted slight offset
+      // Check if dropdown would go off-screen at the bottom
+      const potentialDropdownBottom = py + h + (Platform.OS === 'ios' ? 8 : 10) + screenHeight * 0.4; // Max height
+      const spaceBelow = screenHeight - (py + h);
+      const spaceAbove = py;
+
+      let topPosition = py + h + (Platform.OS === 'ios' ? 8 : 10); // Default below trigger
+
+      // If not enough space below, try to open upwards
+      if (potentialDropdownBottom > screenHeight && spaceAbove > screenHeight * 0.4) {
+        topPosition = py - (screenHeight * 0.4 + (Platform.OS === 'ios' ? 8 : 10)); // Open above trigger
+      } else if (potentialDropdownBottom > screenHeight && spaceAbove <= screenHeight * 0.4) {
+        // If not enough space anywhere, position from top and limit height
+        topPosition = 10; // Small margin from top
+      }
+
+      setDropdownTop(topPosition);
       setDropdownWidth(_w);
       setDropdownLeft(px);
     });
+  }, []);
+
+  // UseEffect for initial position calculation and whenever dimensions change
+  useEffect(() => {
+    if (modalVisible) {
+      calculateDropdownPosition();
+    }
+  }, [modalVisible, calculateDropdownPosition, Dimensions.get('window').width, Dimensions.get('window').height]);
+
+
+  const openDropdown = () => {
+    if (disabled) return; // Prevent opening if disabled
+
+    Keyboard.dismiss(); // Dismiss keyboard when dropdown opens
+    calculateDropdownPosition(); // Calculate position right before opening
+
     setModalVisible(true);
+    // Start animations
+    Animated.timing(opacityAnim, {
+      toValue: 1,
+      duration: 200, // Quick fade in
+      useNativeDriver: true,
+    }).start();
+    Animated.spring(scaleAnim, { // Spring animation for a bouncy feel
+      toValue: 1,
+      friction: 7, // Adjust for bounciness
+      tension: 60, // Adjust for speed
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeDropdown = () => {
+    Animated.timing(opacityAnim, {
+      toValue: 0,
+      duration: 150, // Quicker fade out
+      useNativeDriver: true,
+    }).start(() => {
+      setModalVisible(false);
+      scaleAnim.setValue(0.95); // Reset scale for next open
+    });
   };
 
   const onItemPress = (item: DropdownItem) => {
     onValueChange(item.value);
-    setModalVisible(false);
+    closeDropdown(); // Close modal with animation
   };
 
   const renderItem = ({ item }: { item: DropdownItem }) => (
@@ -93,58 +153,65 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         {item.label}
       </Text>
       {selectedValue === item.value && (
-        <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+        <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
       )}
     </TouchableOpacity>
   );
 
   const displayValue = options.find(option => option.value === selectedValue)?.label || placeholder;
-  const isPlaceholder = !selectedValue; // Check if selectedValue is empty/falsy
+  const isPlaceholder = !selectedValue;
 
   return (
     <View style={[styles.container, style]}>
       {label && <Text style={styles.label}>{label}</Text>}
       <TouchableOpacity
         ref={triggerRef}
-        style={styles.dropdownTrigger}
+        style={[styles.dropdownTrigger, disabled && styles.dropdownTriggerDisabled]}
         onPress={openDropdown}
-        activeOpacity={0.8}
+        activeOpacity={disabled ? 1 : 0.8} // No active opacity change if disabled
+        disabled={disabled} // Disable the TouchableOpacity
       >
         <Text style={[styles.dropdownTriggerText, isPlaceholder && styles.placeholderText]}>
           {displayValue}
         </Text>
-        <Ionicons name={icon} size={20} color="#757575" /> {/* Neutral icon color */}
+        <Ionicons
+          name={icon}
+          size={20}
+          color={disabled ? Colors.placeholder : Colors.textSecondary}
+        />
       </TouchableOpacity>
 
       <Modal
         visible={modalVisible}
         transparent
-        animationType="fade" // Smooth fade animation
-        onRequestClose={() => setModalVisible(false)}
+        animationType="none" // Use custom Animated.View for animation
+        onRequestClose={closeDropdown}
       >
-        <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
+        <TouchableWithoutFeedback onPress={closeDropdown}>
           <View style={styles.overlay}>
-            <View
+            <Animated.View
               style={[
                 styles.dropdownModal,
                 {
                   top: dropdownTop,
                   width: dropdownWidth,
-                  maxHeight: screenHeight * 0.4, // Limit height to 40% of screen
+                  maxHeight: screenHeight * 0.4,
                   left: dropdownLeft,
+                  opacity: opacityAnim, // Bind opacity to animation value
+                  transform: [{ scale: scaleAnim }], // Bind scale to animation value
                 },
               ]}
             >
               <FlatList
                 data={options}
                 renderItem={renderItem}
-                keyExtractor={(item) => String(item.value)} // Ensure key is string
+                keyExtractor={(item) => String(item.value)}
                 showsVerticalScrollIndicator={true}
                 ListEmptyComponent={<Text style={styles.dropdownEmptyText}>No options available</Text>}
                 contentContainerStyle={styles.dropdownListContent}
-                keyboardShouldPersistTaps="handled" // Keep taps handled
+                keyboardShouldPersistTaps="handled"
               />
-            </View>
+            </Animated.View>
           </View>
         </TouchableWithoutFeedback>
       </Modal>
@@ -154,61 +221,65 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 20, // Increased margin for better spacing
+    marginBottom: 20,
   },
   label: {
     fontSize: 16,
-    fontWeight: '600', // Slightly bolder label
-    color: '#424242', // Darker text for labels
+    fontWeight: '600',
+    color: Colors.textPrimary,
     marginBottom: 8,
   },
   dropdownTrigger: {
     borderWidth: 1,
-    borderColor: '#E0E0E0', // Lighter, subtle border
-    paddingVertical: 14, // Increased vertical padding
+    borderColor: Colors.border,
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 12, // More rounded corners
-    backgroundColor: '#FFFFFF', // White background
+    borderRadius: 12,
+    backgroundColor: Colors.background,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    minHeight: 56, // Ensure a minimum height for consistent touch target
+    minHeight: 56,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 }, // More pronounced shadow
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 6,
-    elevation: 5, // Android shadow
+    elevation: 5,
+  },
+  dropdownTriggerDisabled: {
+    backgroundColor: '#F5F5F5', // Lighter background when disabled
+    borderColor: '#E0E0E0',
   },
   dropdownTriggerText: {
     fontSize: 16,
-    color: '#424242', // Darker active text
+    color: Colors.textPrimary,
     flex: 1,
   },
   placeholderText: {
-    color: '#9E9E9E', // Grey for placeholder
+    color: Colors.placeholder,
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)', // Slightly lighter overlay
-    justifyContent: 'flex-start', // Align content to the top
-    alignItems: 'flex-start', // Align content to the left
+    backgroundColor: Colors.overlay,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
   },
   dropdownModal: {
     position: 'absolute',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.background,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: Colors.border,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 }, // Deeper shadow for modal
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 15,
     overflow: 'hidden', // Ensures content respects border radius
-    maxHeight: screenHeight * 0.4, // Limits dropdown height
+    maxHeight: screenHeight * 0.4,
   },
   dropdownListContent: {
-    paddingVertical: 4, // Slightly less padding to fit more items
+    paddingVertical: 4,
   },
   dropdownItem: {
     paddingVertical: 14,
@@ -216,24 +287,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF', // Ensures white background for items
+    backgroundColor: Colors.background,
+    minHeight: 50, // Ensure consistent height for touch targets
   },
   dropdownItemText: {
     fontSize: 16,
-    color: '#424242',
+    color: Colors.textPrimary,
     flex: 1,
   },
   dropdownSelectedItem: {
-    backgroundColor: '#E8F5E9', // Light green for selected item background
+    backgroundColor: Colors.selectedBg, // Use the new selected background color
   },
   dropdownSelectedItemText: {
-    fontWeight: '600', // Bolder for selected text
-    color: '#2E7D32', // Dark green for selected text
+    fontWeight: '600',
+    color: Colors.selectedText, // Use the new selected text color
   },
   dropdownEmptyText: {
     padding: 20,
     textAlign: 'center',
-    color: '#9E9E9E',
+    color: Colors.placeholder,
     fontSize: 15,
   },
 });

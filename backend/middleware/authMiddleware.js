@@ -7,7 +7,7 @@ exports.authenticate = async (req, res, next) => {
 
   const { data: { user }, error } = await supabase.auth.getUser(token);
   if (error || !user) return res.status(401).json({ error: 'Invalid token' });
-  // console.log("token is okay!")
+  console.log("token is okay!")
   req.user = user;
   next();
 };

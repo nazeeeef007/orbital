@@ -4,7 +4,7 @@ const uploadController = require('../controllers/uploadController');
 const { authenticate } = require('../middleware/authMiddleware');
 const upload = require('../middleware/multerMiddleware'); // we'll define this below
 
-// Route: /api/meals/upload
+// Route: /api/upload/upload
 router.post(
   '/upload',
   authenticate,

@@ -17,9 +17,7 @@ const RecommendationHeader: React.FC<RecommendationHeaderProps> = ({
   return (
     <View style={styles.header}>
       <Text style={styles.headerTitle}>{title}</Text>
-      <TouchableOpacity onPress={onToggleViewMode} style={styles.toggleButton}>
-        <Ionicons name={viewMode === 'grid' ? 'list' : 'grid'} size={24} color="#333" />
-      </TouchableOpacity>
+   
     </View>
   );
 };
@@ -30,20 +28,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: 'bold',
     color: '#333',
   },
-  toggleButton: {
-    padding: 5, // Make the touch area a bit larger
-  }
+  
 });
 
 export default RecommendationHeader;

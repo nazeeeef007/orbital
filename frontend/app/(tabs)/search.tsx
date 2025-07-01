@@ -1,4 +1,3 @@
-// app/(tabs)/search.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -11,6 +10,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { BASE_URL } from '@/config';
@@ -20,6 +20,22 @@ import { Ionicons } from '@expo/vector-icons';
 
 let debounceTimer: NodeJS.Timeout;
 
+// --- Consistent Color Palette ---
+const Colors = {
+  primary: '#6C63FF', // A vibrant purple/blue for primary actions
+  secondary: '#00B8D9', // A bright teal for secondary elements (used for active toggle)
+  background: '#F0F2F5', // Light grey for a clean background
+  cardBackground: '#FFFFFF', // White for cards and inputs
+  textPrimary: '#333333', // Dark text for readability
+  textSecondary: '#6B7280', // Lighter text for hints and labels
+  border: '#E5E7EB', // Subtle border color
+  success: '#28A745', // Green for success
+  error: '#DC3545', // Red for errors
+  warning: '#FFC107', // Yellow for warnings
+  placeholder: '#9CA3AF', // Placeholder text color
+};
+// --- End Color Palette ---
+
 export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [type, setType] = useState<'meals' | 'users'>('meals');
@@ -27,20 +43,14 @@ export default function SearchScreen() {
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // DEBUG LOG: Track query and hasSearched
-  console.log('SearchScreen rendered. query:', `"${query}"`, 'hasSearched:', hasSearched);
-
-
   useEffect(() => {
     if (!query.trim()) {
-      console.log('SearchScreen useEffect: Query is empty. Setting hasSearched to false.'); // DEBUG LOG
       setResults([]);
       setHasSearched(false);
       clearTimeout(debounceTimer);
       return;
     }
 
-    console.log('SearchScreen useEffect: Query is NOT empty. Setting hasSearched to true.'); // DEBUG LOG
     setHasSearched(true);
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
@@ -53,7 +63,7 @@ export default function SearchScreen() {
     try {
       const token = await SecureStore.getItemAsync('authToken');
       if (!token) {
-        Alert.alert('Authentication token not found. Please log in again.');
+        Alert.alert('Authentication Error', 'Authentication token not found. Please log in again.');
         return;
       }
 
@@ -83,59 +93,57 @@ export default function SearchScreen() {
   }, [query, type]);
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
-      <View style={styles.container}>
-        {/* Search Input Bar */}
-        <View style={styles.searchBarWrapper}>
-          <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
-          <TextInput
-            placeholder="Search users or meals..."
-            value={query}
-            onChangeText={setQuery}
-            style={styles.input}
-            placeholderTextColor="#888"
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-          {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery('')} style={styles.clearButton}>
-              <Ionicons name="close-circle" size={20} color="#888" />
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <View style={styles.container}>
+          {/* Search Input Bar */}
+          <View style={styles.searchBarWrapper}>
+            <Ionicons name="search" size={20} color={Colors.placeholder} style={styles.searchIcon} />
+            <TextInput
+              placeholder="Search users or meals..."
+              value={query}
+              onChangeText={setQuery}
+              style={styles.input}
+              placeholderTextColor={Colors.placeholder}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={() => setQuery('')} style={styles.clearButton}>
+                <Ionicons name="close-circle" size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Toggle Buttons - Made Sleeker */}
+          <View style={styles.toggleContainer}>
+            <TouchableOpacity
+              style={[styles.toggleButton, type === 'meals' && styles.activeToggleButton]}
+              onPress={() => setType('meals')}
+            >
+              <Text style={[styles.toggleText, type === 'meals' && styles.activeToggleText]}>Meals</Text>
             </TouchableOpacity>
-          )}
-        </View>
 
-        {/* Toggle Buttons */}
-        <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            style={[styles.toggleButton, type === 'users' && styles.activeButton]}
-            onPress={() => setType('users')}
-          >
-            <Text style={[styles.toggleText, type === 'users' && styles.activeButtonText]}>Users</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleButton, type === 'users' && styles.activeToggleButton]}
+              onPress={() => setType('users')}
+            >
+              <Text style={[styles.toggleText, type === 'users' && styles.activeToggleText]}>Users</Text>
+            </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity
-            style={[styles.toggleButton, type === 'meals' && styles.activeButton]}
-            onPress={() => setType('meals')}
-          >
-            <Text style={[styles.toggleText, type === 'meals' && styles.activeButtonText]}>Meals</Text>
-          </TouchableOpacity>
-        </View>
+          {loading && hasSearched && <ActivityIndicator size="large" color={Colors.primary} style={styles.loader} />}
 
-        {loading && hasSearched && <ActivityIndicator size="large" color="#FE2C55" style={styles.loader} />}
-
-        {/* Conditionally render RecommendationScreen or Search Results */}
-        {!hasSearched ? (
-          <>
-            {console.log('Rendering RecommendationScreen')} {/* DEBUG LOG */}
-            <RecommendationScreen />
-          </>
-        ) : (
-          <>
-            {console.log('Rendering Search Results FlatList')} {/* DEBUG LOG */}
+          {/* Conditionally render RecommendationScreen or Search Results */}
+          {!hasSearched ? (
+            <View style={styles.recommendationWrapper}>
+              <RecommendationScreen />
+            </View>
+          ) : (
             <FlatList
               data={results}
               keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
@@ -143,108 +151,145 @@ export default function SearchScreen() {
               ListEmptyComponent={
                 !loading && query.trim().length > 0 && results.length === 0 ? (
                   <View style={styles.centeredMessage}>
-                    <Ionicons name="compass-outline" size={48} color="#888" />
+                    <Ionicons name="alert-circle-outline" size={48} color={Colors.textSecondary} />
                     <Text style={styles.emptyText}>No results found for "{query}".</Text>
-                    <Text style={styles.emptySubText}>Try a different query or switch type.</Text>
+                    <Text style={styles.emptySubText}>Try a different query or switch search type.</Text>
                   </View>
                 ) : null
               }
-              contentContainerStyle={{ paddingBottom: 100 }}
+              contentContainerStyle={styles.resultsListContent}
               showsVerticalScrollIndicator={false}
               style={styles.resultsList}
             />
-          </>
-        )}
-      </View>
-    </KeyboardAvoidingView>
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  // ... (unchanged styles)
+  safeArea: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  keyboardAvoidingContainer: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? 10 : 0,
+    backgroundColor: Colors.background,
   },
   searchBarWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    marginBottom: 15,
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    height: 44,
+    marginBottom: 4, // Adjusted marginBottom to be closer to the toggle
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: Colors.border,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+    marginTop: 30,
   },
   searchIcon: {
     marginRight: 10,
+    color: Colors.placeholder,
   },
   input: {
     flex: 1,
-    height: 48,
     fontSize: 16,
-    color: '#333',
+    color: Colors.textPrimary,
+    paddingVertical: 0, // Ensure no extra vertical padding within the input itself
   },
   clearButton: {
     marginLeft: 10,
     padding: 5,
   },
+  // --- Sleeker Toggle Styles ---
   toggleContainer: {
     flexDirection: 'row',
-    backgroundColor: '#EAEAEA',
-    borderRadius: 10,
-    marginBottom: 20,
-    overflow: 'hidden',
-    alignSelf: 'center',
-    width: '90%',
+    backgroundColor: Colors.cardBackground, // Background for the whole toggle bar
+    borderRadius: 10, // Slightly less rounded than search bar for a subtle difference
+    overflow: 'hidden', // Ensures active button's border radius is respected
+    alignSelf: 'center', // Center the toggle bar
+    width: '100%', // Take full width within padding
+    marginBottom: 5, // Space below the toggle
+    borderWidth: 1, // Subtle border for the container
+    borderColor: Colors.border,
+    height: 40, // Reduced overall height
   },
   toggleButton: {
     flex: 1,
-    paddingVertical: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 0, // No specific padding, let height dictate
   },
-  activeButton: {
-    backgroundColor: '#FE2C55',
-    borderRadius: 8,
-    margin: 4,
+  activeToggleButton: {
+    backgroundColor: Colors.primary, // Use primary color for active state
+    borderRadius: 8, // Rounded corners for the active segment
+    margin: 2, // Creates a small gap around the active segment
+    shadowColor: Colors.primary, // Shadow matches active color
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   toggleText: {
-    color: '#555',
+    color: Colors.textSecondary, // Default inactive text color
     fontWeight: '600',
-    fontSize: 15,
+    fontSize: 14, // Slightly smaller text
   },
-  activeButtonText: {
-    color: 'white',
+  activeToggleText: {
+    color: Colors.cardBackground, // White text for active button
   },
+  // --- End Sleeker Toggle Styles ---
   loader: {
-    marginVertical: 20,
+    marginVertical: 30,
+  },
+  recommendationWrapper: {
+    flex: 1,
+    paddingTop: 1,
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+    marginBottom: 0,
   },
   centeredMessage: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 50,
+    paddingVertical: 60,
   },
   emptyText: {
     textAlign: 'center',
     marginTop: 15,
-    color: '#888',
+    color: Colors.textSecondary,
     fontSize: 17,
     fontWeight: '500',
   },
   emptySubText: {
     textAlign: 'center',
     marginTop: 5,
-    color: '#A0A0A0',
+    color: Colors.placeholder,
     fontSize: 14,
   },
   resultsList: {
     flex: 1,
+    marginTop: 10,
+  },
+  resultsListContent: {
+    paddingBottom: 40,
   },
 });

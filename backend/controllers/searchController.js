@@ -5,40 +5,34 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 const { v4: uuidv4 } = require('uuid');
 
 const searchHandler = async (req, res) => {
-  const { q, type} = req.query;
+  const { q, type } = req.query;
   const user_id = req.user?.id;
-  console.log('Search endpoint hit with query:', req.query);
 
-  if (!q || typeof q !== 'string' || q.trim() === '') {
-    return res.status(400).json({ error: 'Missing or invalid query parameter "q"' });
+  // --- validate ---
+  if (!q || typeof q !== 'string' || !q.trim()) {
+    return res.status(400).json({ error: 'Invalid query parameter "q".' });
+  }
+  if (!['users', 'meals'].includes(type)) {
+    return res.status(400).json({ error: 'Type must be "users" or "meals".' });
   }
 
-  if (!type || !['users', 'meals'].includes(type)) {
-    return res.status(400).json({ error: 'Invalid or missing "type" parameter. Must be "users" or "meals"' });
-  }
-
-  const keyword = `%${q}%`;
+  const keyword = `%${q.toLowerCase()}%`;
   const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
-  let result;
 
   try {
-    // 🧠 Save search history
-    console.log(user_id);
+    // — save history for meals —
     if (user_id && type === 'meals') {
-      console.log("saving search histroy..");
-      await supabase
-        .from('search_history')
-        .insert({
-          id: uuidv4(),
-          user_id,
-          query: q,
-          search_type: 'meals',
-          filters: null,
-          created_at: new Date().toISOString(),
-        });
+      await supabase.from('search_history').insert({
+        id: uuidv4(),
+        user_id,
+        query: q,
+        search_type: 'meals',
+        filters: null,
+        created_at: new Date().toISOString(),
+      });
     }
 
-    // 👥 Search users
+    // — user search —
     if (type === 'users') {
       const { data, error, status } = await supabase
         .from('profiles')
@@ -47,55 +41,85 @@ const searchHandler = async (req, res) => {
         .limit(20);
 
       if (error) {
-        console.error('Supabase error (users):', error.message);
-        return res.status(status || 500).json({ error: 'Error querying user profiles' });
+        console.error('Supabase user search error:', error);
+        return res.status(status || 500).json({ error: 'Unable to search users.' });
       }
-
       return res.status(200).json({ results: data });
     }
 
-    // 🍱 Search meals
-    const { data: meals, error, status } = await supabase
+    // — meal search —
+    const { data: meals, error: mealError, status: mealStatus } = await supabase
       .from('meals')
-      .select('id, recipe_text, meal_image_url, calories, created_at, user_id, cuisine, meal_time, course_type, diet_type, spice_level, prep_time_mins, serving_size');
+      .select(`
+        id,
+        user_id,
+        meal_image_url,
+        recipe_text,
+        recipe_image_url,
+        calories,
+        protein,
+        carbs,
+        fat,
+        created_at,
+        cuisine,
+        meal_time,
+        diet_type,
+        spice_level,
+        prep_time_mins,
+        price,
+        location,
+        meal_likes:meal_likes(count),
+        meal_saves:meal_saves(count)
+      `)
+      .or([
+        `recipe_text.ilike.${keyword}`,
+        `cuisine.ilike.${keyword}`,
+        `meal_time.ilike.${keyword}`,
+        `diet_type.ilike.${keyword}`,
+        `spice_level.ilike.${keyword}`,
+        `location.ilike.${keyword}`
+      ].join(','))
+      .limit(50);
 
-    if (error) {
-      console.error('Supabase error (meals):', error.message);
-      return res.status(status || 500).json({ error: 'Error querying meals' });
+    if (mealError) {
+      console.error('Supabase meal search error:', mealError);
+      return res.status(mealStatus || 500).json({ error: 'Unable to search meals.' });
     }
 
-    // 📊 Compute relevance score for each meal
-    const scored = meals.map(meal => {
+    // — score & boost by popularity —
+    const scored = meals.map(m => {
       const fields = [
-        meal.recipe_text,
-        meal.cuisine,
-        meal.meal_time,
-        meal.course_type,
-        meal.diet_type,
-        meal.spice_level,
-        meal.serving_size,
-      ].map(v => v?.toLowerCase() || '');
+        m.recipe_text,
+        m.cuisine,
+        m.meal_time,
+        m.diet_type,
+        m.spice_level,
+        m.location
+      ].map(f => (f || '').toLowerCase());
 
-      let score = 0;
-      for (const word of terms) {
-        for (const field of fields) {
-          if (field.includes(word)) score += 1;
+      let relevance = 0;
+      for (const term of terms) {
+        for (const f of fields) {
+          if (f.includes(term)) relevance++;
         }
       }
+      const likes = m.meal_likes?.count ?? 0;
+      const saves = m.meal_saves?.count ?? 0;
+      const popularity = likes + 1.5 * saves;
 
-      return { ...meal, score };
+      return { ...m, score: relevance + popularity };
     });
 
-    // 🔽 Sort by score
+    // — sort & return —
     scored.sort((a, b) => b.score - a.score);
-    
     return res.status(200).json({ results: scored });
 
   } catch (err) {
-    console.error('Unexpected server error:', err);
-    return res.status(500).json({ error: 'Unexpected server error. Please try again later.' });
+    console.error('Search handler error:', err);
+    return res.status(500).json({ error: 'Internal server error.' });
   }
 };
+
 
 const recommendationHandler = async (req, res) => {
   const user_id = req.user?.id;

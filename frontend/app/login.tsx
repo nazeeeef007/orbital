@@ -3,17 +3,15 @@ import {
   View,
   Text,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AuthTextInput from '../components/AuthTextInput';
-import * as SecureStore from 'expo-secure-store';
 import { BASE_URL } from '@/config';
+import { useAuth } from '../hooks/useAuth';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -21,6 +19,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+  const { login } = useAuth(); // 👈 hook usage
 
   const handleLogin = async () => {
     setMessage(null);
@@ -28,6 +27,7 @@ export default function LoginScreen() {
       setMessage({ type: 'error', text: 'Please enter both email and password.' });
       return;
     }
+
     setLoading(true);
     try {
       const response = await fetch(`${BASE_URL}/api/auth/login`, {
@@ -40,26 +40,22 @@ export default function LoginScreen() {
       setLoading(false);
 
       if (!response.ok) {
-        if (data.error === 'Invalid email') {
-          setMessage({ type: 'error', text: 'Email address not found.' });
-        } else if (data.error === 'Invalid password') {
-          setMessage({ type: 'error', text: 'Incorrect password. Please try again.' });
-        } else {
-          setMessage({ type: 'error', text: data.error || 'Login failed. Please check your credentials.' });
-        }
-      } else {
-        const { session } = data.data;
-        if (!session || !session.access_token) {
-          setMessage({ type: 'error', text: 'Login failed: token missing.' });
-          return;
-        }
-        await SecureStore.setItemAsync('authToken', session.access_token); // ✅ Correct method
-        console.log(session.access_token);
-        setMessage({ type: 'success', text: 'Login successful! Redirecting...' });
-        setTimeout(() => {
-          router.replace('/home');
-        }, 1000);
+        setMessage({
+          type: 'error',
+          text: data.error || 'Login failed. Please check your credentials.',
+        });
+        return;
       }
+
+      const { session } = data.data;
+      if (!session?.access_token) {
+        setMessage({ type: 'error', text: 'Login failed: token missing.' });
+        return;
+      }
+
+      setMessage({ type: 'success', text: 'Login successful! Redirecting...' });
+      await login(session.access_token); // ✅ handles saving token and redirect
+
     } catch (err) {
       setLoading(false);
       setMessage({ type: 'error', text: 'Network error. Please try again later.' });
