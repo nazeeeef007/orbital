@@ -1,37 +1,31 @@
-// services/sendImageService.js
 const sharp = require("sharp");
 
 async function analyzeImageWithOpenAI({ imageBase64, description, openai }) {
-  if (!imageBase64 || !imageBase64.startsWith("data:image")) {
-    throw new Error("A valid base64 image is required.");
-  }
   if (!description || typeof description !== "string") {
     throw new Error("Description is required.");
   }
 
-  // Resize and compress image
-  const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-  const imgBuffer = Buffer.from(base64Data, "base64");
+  let resizedBase64 = null;
+  if (imageBase64 && imageBase64.startsWith("data:image")) {
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+    const imgBuffer = Buffer.from(base64Data, "base64");
 
-  const resizedBuffer = await sharp(imgBuffer)
-    .resize({ width: 1024, withoutEnlargement: true })
-    .jpeg({ quality: 80 })
-    .toBuffer();
+    const resizedBuffer = await sharp(imgBuffer)
+      .resize({ width: 1024, withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer();
 
-  const resizedBase64 = `data:image/jpeg;base64,${resizedBuffer.toString("base64")}`;
+    resizedBase64 = `data:image/jpeg;base64,${resizedBuffer.toString("base64")}`;
+  }
 
   // Infer meal time
   const hour = new Date().getHours();
-  let mealTime = "Snack";
-  if (hour >= 5 && hour < 11) mealTime = "Breakfast";
-  else if (hour >= 11 && hour < 15) mealTime = "Lunch";
-  else if (hour >= 17 && hour < 21) mealTime = "Dinner";
 
+  // Construct messages
   const messages = [
     {
       role: "system",
-      content: `You are a nutrition assistant. Given a food image and description, reply ONLY with JSON estimating macros based primarily on the portion size visible in the image. 
-Use the description only if the image is unclear or unusable. Be sure the macros reflect the actual portion size in the image:
+      content: `You are a nutrition assistant. Given a food description${resizedBase64 ? " and image" : ""}, reply ONLY with JSON estimating macros based on visible or implied portion size. If there's no image, use the description only:
 {
   "macros": { "calories": number, "protein": number, "carbs": number, "fat": number },
   "cuisine": string,
@@ -44,9 +38,15 @@ No explanations or extra text.`,
       content: [
         {
           type: "text",
-          text: `User says: "${description}". Based on this and the image, estimate macros, cuisine, and meal time (use server time hint: ${mealTime}). Prioritize the portion size seen in the image; use description only if the image is unusable.`,
+          text: `User says: "${description}". Estimate the macros, cuisine, and meal time (hint: ${hour}). ${
+            resizedBase64
+              ? "Prioritize the portion size seen in the image."
+              : "Rely solely on the description since there is no image."
+          }`,
         },
-        { type: "image_url", image_url: { url: resizedBase64 } },
+        ...(resizedBase64
+          ? [{ type: "image_url", image_url: { url: resizedBase64 } }]
+          : []),
       ],
     },
   ];
