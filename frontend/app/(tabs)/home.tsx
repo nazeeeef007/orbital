@@ -2,13 +2,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import * as SecureStore from 'expo-secure-store';
 import axios from "axios";
 import { BASE_URL } from "@/config";
 import MacroHistoryChart from "../components/MacroHistoryChart";
-import { useAuth } from "../../hooks/useAuth";
+import { useAuth } from "../../hooks/useAuth"; // Make sure this path is correct
 
-// Define the DailyMacroHistory interface as it's used here
+// --- Interfaces ---
 interface DailyMacroHistory {
   id: string;
   date: string;
@@ -18,105 +17,85 @@ interface DailyMacroHistory {
   fat: number;
 }
 
-// Define the UserProfile interface to match your 'profiles' table structure
+// UserProfile interface is no longer needed here if it's imported from useAuth or a shared types file
+// but kept for clarity if you have other local uses of it.
+// Ideally, it would be a shared type.
 interface UserProfile {
   id: string;
   username: string;
   display_name: string;
-  bio: string;
-  location: string;
-  website: string;
-  avatar_url: string;
-  calories_goal: number;
-  protein_goal: number;
-  carbs_goal: number;
-  fat_goal: number;
-  daily_calories: number;
-  daily_protein: number;
-  daily_carbs: number;
-  daily_fat: number;
-  // Add other fields from your profiles table if needed
+  bio: string | null;
+  location: string | null;
+  website: string | null;
+  avatar_url: string | null;
+  calories_goal: number | null;
+  protein_goal: number | null;
+  carbs_goal: number | null;
+  fat_goal: number | null;
+  daily_calories: number | null;
+  daily_protein: number | null;
+  daily_carbs: number | null;
+  daily_fat: number | null;
 }
 
+
+// --- HomeScreen Component ---
 export default function HomeScreen() {
   const router = useRouter();
-  const { logout: authLogout } = useAuth();
-  const [macroHistory, setMacroHistory] = useState<DailyMacroHistory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [loggedInUserDisplayName, setLoggedInUserDisplayName] = useState<string>("User");
-  const [loggedInUserAvatar, setLoggedInUserAvatar] = useState<string>("https://i.pravatar.cc/150?img=12");
-  // Optional: State to store full profile data if you need to display other fields later
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  // Destructure `user`, `logout`, `authToken`, and `loading` from useAuth
+  const { user, logout: authLogout, authToken, loading: authLoading } = useAuth(); // Access user profile and auth state from context
 
-  const fetchUserDataAndMacroHistory = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const [macroHistory, setMacroHistory] = useState<DailyMacroHistory[]>([]);
+  const [loadingMacroHistory, setLoadingMacroHistory] = useState(true); // Separate loading state for history
+  const [errorMacroHistory, setErrorMacroHistory] = useState<string | null>(null); // Separate error for history
+
+  // Derive display name and avatar directly from the `user` object from useAuth
+  const loggedInUserDisplayName = user?.display_name || user?.username || "User";
+  const loggedInUserAvatar = user?.avatar_url || "https://i.pravatar.cc/150?img=12";
+
+  // Function to fetch only macro history now
+  const fetchMacroHistory = useCallback(async () => {
+    setLoadingMacroHistory(true);
+    setErrorMacroHistory(null);
+
+    // Ensure we have a user ID and token from the global context before fetching history
+    if (!user?.id || !authToken) {
+      setErrorMacroHistory("User not authenticated or profile not loaded.");
+      setLoadingMacroHistory(false);
+      return;
+    }
 
     try {
-      const storedToken = await SecureStore.getItemAsync("authToken");
-      if (!storedToken) {
-        throw new Error("Authentication token not found. Please log in again.");
-      }
-
-      // 1. Fetch logged-in user's basic ID from auth endpoint
-      const authRes = await axios.get(`${BASE_URL}/api/auth/user`, {
-        headers: { Authorization: `Bearer ${storedToken}` },
-      });
-
-      let userAuthInfo: { id: string } | null = null;
-      if (authRes.data && authRes.data.user && typeof authRes.data.user.id === 'string') {
-        userAuthInfo = authRes.data.user;
-      } else if (authRes.data && typeof authRes.data.id === 'string') {
-        userAuthInfo = authRes.data;
-      }
-
-      if (!userAuthInfo || !userAuthInfo.id) {
-        throw new Error("Could not verify user. Please log in again.");
-      }
-
-      // 2. Fetch full profile data using the user's ID
-      const profileRes = await axios.get<UserProfile>(`${BASE_URL}/api/profile/${userAuthInfo.id}`, {
-        headers: { Authorization: `Bearer ${storedToken}` },
-      });
-      const profileData = profileRes.data;
-
-      // Update states with data from the full profile
-      setLoggedInUserDisplayName(profileData.display_name || profileData.username || "User");
-      if (profileData.avatar_url) {
-        setLoggedInUserAvatar(profileData.avatar_url);
-      } else {
-        setLoggedInUserAvatar("https://i.pravatar.cc/150?img=12"); // Default avatar if none is set
-      }
-      setUserProfile(profileData); // Store full profile data
-
-      // 3. Fetch macro history using the user's ID
-      const historyRes = await axios.get< { data: DailyMacroHistory[] } >(`${BASE_URL}/api/macro/${userAuthInfo.id}/history`, {
-        headers: { Authorization: `Bearer ${storedToken}` },
+      const historyRes = await axios.get<{ data: DailyMacroHistory[] }>(`${BASE_URL}/api/macro/${user.id}/history`, {
+        headers: { Authorization: `Bearer ${authToken}` },
       });
 
       setMacroHistory(historyRes.data.data || []);
 
     } catch (err: any) {
-      console.error("Failed to fetch user data or macro history:", err);
+      console.error("Failed to fetch macro history:", err);
       if (err.response) {
         console.error("API Response Error Data:", err.response.data);
         console.error("API Response Status:", err.response.status);
       }
-      setError(err.message || "Failed to load data. Please try again.");
+      setErrorMacroHistory(err.message || "Failed to load macro history. Please try again.");
       if (err.response?.status === 401) {
         Alert.alert("Session Expired", "Your session has expired. Please log in again.", [
           { text: "OK", onPress: authLogout }
         ]);
       }
     } finally {
-      setLoading(false);
+      setLoadingMacroHistory(false);
     }
-  }, [authLogout]);
+  }, [user?.id, authToken, authLogout]); // Depend on user.id, authToken, and authLogout
 
+  // Effect to fetch macro history when user/token changes or component mounts
   useEffect(() => {
-    fetchUserDataAndMacroHistory();
-  }, [fetchUserDataAndMacroHistory]);
+    // Only fetch macro history if user and authToken are available and auth context is not globally loading
+    if (!authLoading && user && authToken) {
+      fetchMacroHistory();
+    }
+  }, [authLoading, user, authToken, fetchMacroHistory]); // Re-run when these dependencies change
 
   const handleLogout = async () => {
     await authLogout();
@@ -124,14 +103,27 @@ export default function HomeScreen() {
 
   const handleStartChat = () => router.push("/chatBot");
 
-  // New handler to navigate to the user's profile
   const handleViewProfile = () => {
-    if (userProfile?.id) {
-      router.push(`/profile`);
+    // Navigate to profile using the user's ID from the global state
+    if (user?.id) {
+      router.push(`/profile`); // Assuming your profile route can fetch its own data or takes user ID as param
+      // If /profile needs the user ID, you might do: router.push(`/profile/${user.id}`);
     } else {
       Alert.alert("Profile Not Loaded", "Could not load profile information. Please try again later.");
     }
   };
+
+  // If the AuthContext is still determining the auth state, show a global loading indicator
+  // This is usually handled by the _layout.tsx wrapping AuthProvider
+  if (authLoading) {
+    // You might not need this if _layout.tsx handles a full splash screen
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#6C63FF" />
+        <Text style={styles.loadingText}>Loading app data...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: "#f9fafb" }}>
@@ -142,7 +134,6 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.profileSection}>
-          {/* Wrap the Image with TouchableOpacity */}
           <TouchableOpacity onPress={handleViewProfile}>
             <Image
               source={{ uri: loggedInUserAvatar }}
@@ -164,15 +155,15 @@ export default function HomeScreen() {
 
           {/* Conditional rendering for Macro History Chart */}
           <View style={styles.macroChartWrapper}>
-            {loading ? (
+            {loadingMacroHistory ? (
               <View style={styles.chartLoadingContainer}>
                 <ActivityIndicator size="large" color="#7c3aed" />
                 <Text style={styles.chartLoadingText}>Loading macro history...</Text>
               </View>
-            ) : error ? (
+            ) : errorMacroHistory ? (
               <View style={styles.chartErrorContainer}>
                 <Ionicons name="alert-circle-outline" size={30} color="#ef4444" />
-                <Text style={styles.chartErrorText}>{error}</Text>
+                <Text style={styles.chartErrorText}>{errorMacroHistory}</Text>
               </View>
             ) : macroHistory.length > 0 ? (
               <MacroHistoryChart macroHistory={macroHistory} />
@@ -204,6 +195,17 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 24,
     paddingBottom: 40,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f9fafb',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#6b7280',
   },
   header: {
     flexDirection: "row",

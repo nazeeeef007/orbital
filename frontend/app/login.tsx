@@ -19,7 +19,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
-  const { login } = useAuth(); // 👈 hook usage
+  const { login } = useAuth();
 
   const handleLogin = async () => {
     setMessage(null);
@@ -37,9 +37,9 @@ export default function LoginScreen() {
       });
 
       const data = await response.json();
-      setLoading(false);
 
       if (!response.ok) {
+        setLoading(false);
         setMessage({
           type: 'error',
           text: data.error || 'Login failed. Please check your credentials.',
@@ -49,17 +49,25 @@ export default function LoginScreen() {
 
       const { session } = data.data;
       if (!session?.access_token) {
+        setLoading(false);
         setMessage({ type: 'error', text: 'Login failed: token missing.' });
         return;
       }
 
       setMessage({ type: 'success', text: 'Login successful! Redirecting...' });
-      await login(session.access_token); // ✅ handles saving token and redirect
+      
+      // Call the login function from useAuth
+      await login(session.access_token);
+      
+      // Navigate to home after successful login
+      router.replace('/home');
 
     } catch (err) {
       setLoading(false);
       setMessage({ type: 'error', text: 'Network error. Please try again later.' });
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 

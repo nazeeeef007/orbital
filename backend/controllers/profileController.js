@@ -154,6 +154,10 @@ const updateProfile = async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
+     // --- IMPORTANT: Invalidate Redis Cache after successful update ---
+    await redisClient.del(`user_profile:${userId}`);
+    console.log(`🧹 Cleared Redis cache for profile of user ${userId}`);
+
     res.status(200).json({ message: 'Profile updated', profile: data });
 
   } catch (err) {

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -7,26 +6,16 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { botApi } from "@/apis/botApi";
 import { mealApi } from "@/apis/mealApi";
-import { BASE_URL } from "@/config";
 import { Meal } from "@/types/meal";
 import TodayMeals from "./components/todayMeals";
-// import { useMacroStore } from "@/store/useMacroStore";
 
 export default function ChatBotScreen() {
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
-  const [nutrition, setNutrition] = useState<null | {
-    calories: number;
-    carbohydrates: number;
-    protein: number;
-    fat: number;
-    sugar: number;
-  }>(null);
+  const [nutrition, setNutrition] = useState<{ calories: number; carbohydrates: number; protein: number; fat: number; sugar: number; } | null>(null);
   const [invalidInput, setInvalid] = useState("");
   const [currentMeals, setMeals] = useState<Meal[]>([]);
 
@@ -41,8 +30,7 @@ export default function ChatBotScreen() {
     };
     fetchMeals();
   }, []);
-  // const { macros, addMacros, clearMacros } = useMacroStore();
-  
+
   const handleSend = async () => {
     if (!prompt.trim()) return;
     setLoading(true);
@@ -50,13 +38,10 @@ export default function ChatBotScreen() {
     setInvalid("");
 
     try {
-      const data = await botApi.sendPrompt(prompt);
-      console.log(data);
-      // addMacros(data); //upload meal withoutImage,
+      const data = await mealApi.estimateNutrition(prompt);
       setNutrition(data);
     } catch (error: any) {
       setInvalid(error.message || "Failed to fetch nutrition info");
-      console.error("Error fetching nutrition:", error);
     } finally {
       setLoading(false);
     }
@@ -64,56 +49,42 @@ export default function ChatBotScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>🥗 Nutrition Chat</Text>
+      {/* Input & Results Card */}
+      <View style={styles.card}>
+        <Text style={styles.header}>🥗 Nutrition Chat</Text>
+        <View style={styles.inputRow}>
+          <TextInput
+            value={prompt}
+            onChangeText={setPrompt}
+            placeholder="e.g., banana"
+            style={styles.input}
+          />
+          <TouchableOpacity style={styles.sendButton} onPress={handleSend} disabled={loading}>
+            <Ionicons name="send" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
 
-      <View style={styles.inputRow}>
-        <TextInput
-          value={prompt}
-          onChangeText={setPrompt}
-          placeholder="e.g., banana"
-          style={styles.input}
-        />
-        <TouchableOpacity
-          style={styles.sendButton}
-          onPress={handleSend}
-          disabled={loading}
-        >
-          <Ionicons name="send" size={20} color="#fff" />
-        </TouchableOpacity>
+        {loading && <ActivityIndicator size="large" color="#6C63FF" style={styles.loader} />}
+
+        {invalidInput ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>⚠️ {invalidInput}</Text>
+          </View>
+        ) : null}
+
+        {nutrition && (
+          <View style={styles.resultBox}>
+            <Text style={styles.resultText}>🔥 Calories: {nutrition.calories} kcal</Text>
+            <Text style={styles.resultText}>🍞 Carbs: {nutrition.carbohydrates}g</Text>
+            <Text style={styles.resultText}>🍗 Protein: {nutrition.protein}g</Text>
+            <Text style={styles.resultText}>🥑 Fat: {nutrition.fat}g</Text>
+            <Text style={styles.resultText}>🍬 Sugar: {nutrition.sugar}g</Text>
+          </View>
+        )}
       </View>
 
-      {loading && (
-        <ActivityIndicator
-          size="large"
-          color="#4f46e5"
-          style={{ marginTop: 20 }}
-        />
-      )}
-
-      {invalidInput && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>⚠️ {invalidInput}</Text>
-        </View>
-      )}
-
-      {!invalidInput && nutrition && (
-        <View style={styles.resultBox}>
-          <Text style={styles.resultText}>
-            🔥 Calories: {nutrition.calories} kcal
-          </Text>
-          <Text style={styles.resultText}>
-            🍞 Carbs: {nutrition.carbohydrates}g
-          </Text>
-          <Text style={styles.resultText}>
-            🍗 Protein: {nutrition.protein}g
-          </Text>
-          <Text style={styles.resultText}>🥑 Fat: {nutrition.fat}g</Text>
-          <Text style={styles.resultText}>🍬 Sugar: {nutrition.sugar}g</Text>
-        </View>
-      )}
-   <>
-      <TodayMeals meals={currentMeals}/>
-    </>
+      {/* Today's Meals List */}
+      <TodayMeals meals={currentMeals} />
     </View>
   );
 }
@@ -122,19 +93,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f9fafb",
-    paddingTop: 80,
-    paddingHorizontal: 24,
+    paddingTop: 8,
+  },
+  card: {
+    backgroundColor: "#fff",
+    marginHorizontal: 12,
+    marginTop: 8,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 3,
   },
   header: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 24,
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1f2937",
+    marginBottom: 12,
     textAlign: "center",
-    color: "#111827",
   },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
+    marginBottom: 12,
   },
   input: {
     flex: 1,
@@ -145,48 +127,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   sendButton: {
-    backgroundColor: "#4f46e5",
+    backgroundColor: "#6C63FF",
     padding: 12,
     marginLeft: 10,
     borderRadius: 10,
   },
-  resultBox: {
-    marginTop: 30,
-    backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 12,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-  },
-  resultText: {
-    fontSize: 16,
-    marginBottom: 8,
-    color: "#1f2937",
+  loader: {
+    marginVertical: 12,
   },
   errorBox: {
     backgroundColor: "#fee2e2",
     padding: 12,
     borderRadius: 8,
-    marginTop: 16,
+    marginBottom: 12,
   },
   errorText: {
     color: "#b91c1c",
     fontWeight: "600",
     fontSize: 14,
   },
-
-  resetButton: {
-    marginTop: 16,
-    backgroundColor: "#ef4444",
-    paddingVertical: 10,
+  resultBox: {
+    backgroundColor: "#f3f4f6",
+    padding: 12,
     borderRadius: 8,
-    alignItems: "center",
+    marginTop: 8,
   },
-  resetButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
+  resultText: {
     fontSize: 16,
+    marginBottom: 6,
+    color: "#1f2937",
   },
 });

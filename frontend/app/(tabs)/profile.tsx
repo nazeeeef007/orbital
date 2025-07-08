@@ -12,13 +12,13 @@ import {
 } from 'react-native';
 import { Avatar, Button, TextInput, useTheme, Card } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
-import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 import * as Progress from 'react-native-progress';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute } from '@react-navigation/native';
 import { BASE_URL } from '@/config';
 import MacroHistoryChart from '../components/MacroHistoryChart';
+import { useAuth } from '../../hooks/useAuth'; // Import useAuth hook
 
 // --- Define appColors outside the component for consistent access ---
 const appColors = {
@@ -40,12 +40,19 @@ const appColors = {
 const Profile = () => {
   const theme = useTheme();
   const route = useRoute();
+  // Destructure from useAuth
+  const { user: authUser, authToken, loading: authLoading, refreshUserProfile, logout: authLogout } = useAuth();
+
 
   // FIX: More robust access to route.params.id
   // Ensure route.params is an object (even empty) before destructuring 'id'
   const routeUserId = (route.params as { id?: string } | undefined)?.id;
 
-  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(null);
+  // We no longer need to manage loggedInUserId and token separately,
+  // as useAuth provides the global user and token state.
+  // const [loggedInUserId, setLoggedInUserId] = useState<string | null>(null);
+  // const [token, setToken] = useState<string | null>(null);
+
   const [isMyProfile, setIsMyProfile] = useState(false);
   const [form, setForm] = useState({
     username: '',
@@ -64,53 +71,34 @@ const Profile = () => {
   });
 
   const [avatar, setAvatar] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false); // For form submission
   const [macroHistory, setMacroHistory] = useState<any[]>([]);
   const [isEditingGoals, setIsEditingGoals] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false); // For pull-to-refresh
 
   const initialize = useCallback(async () => {
+    // Prevent re-fetching if auth is still loading or no token is available from useAuth
+    if (authLoading || !authToken || !authUser?.id) {
+      setRefreshing(false);
+      return;
+    }
+
     setRefreshing(true);
     try {
-      const storedToken = await SecureStore.getItemAsync('authToken');
-      if (!storedToken) {
-        Alert.alert('Authentication Error', 'No authentication token found. Please log in again.');
-        setRefreshing(false);
-        return;
-      }
-      setToken(storedToken);
+      // The token is now from useAuth
+      // setToken(authToken); // No longer needed as we use authToken directly
 
-      // Get logged-in user's ID from the token
-      const authRes = await axios.get(`${BASE_URL}/api/auth/user`, {
-        headers: { Authorization: `Bearer ${storedToken}` },
-      });
-
-      // Log the entire response data to help debug its exact structure
-      console.log("Auth response data:", authRes.data);
-
-      let user: { id: string } | null = null;
-      if (authRes.data && authRes.data.user && typeof authRes.data.user.id === 'string') {
-        user = authRes.data.user;
-      } else if (authRes.data && typeof authRes.data.id === 'string') {
-        user = authRes.data;
-      }
-
-      if (!user || !user.id) {
-        console.error("Auth response did not contain a valid user object or user ID:", user);
-        Alert.alert('Authentication Error', 'Could not verify user. Please log in again.');
-        setRefreshing(false);
-        return;
-      }
-      setLoggedInUserId(user.id);
+      // Logged-in user's ID is from authUser
+      const currentLoggedInUserId = authUser.id;
+      // setLoggedInUserId(currentLoggedInUserId); // No longer needed
 
       // Determine the user ID to fetch: routeUserId if present, otherwise loggedInUserId (for own profile)
-      const userIdToFetch = routeUserId || user.id;
-      setIsMyProfile(userIdToFetch === user.id);
+      const userIdToFetch = routeUserId || currentLoggedInUserId;
+      setIsMyProfile(userIdToFetch === currentLoggedInUserId);
 
       // --- Fetch Profile Data ---
       const profileRes = await axios.get(`${BASE_URL}/api/profile/${userIdToFetch}`, {
-        headers: { Authorization: `Bearer ${storedToken}` },
+        headers: { Authorization: `Bearer ${authToken}` },
       });
       const profileData = profileRes.data;
 
@@ -132,8 +120,8 @@ const Profile = () => {
       setAvatar(profileData.avatar_url || null);
 
       // --- Fetch Macro History Data (for any viewed profile) ---
-      const historyRes = await axios.get(`${BASE_URL}/api/macro/${userIdToFetch}/history`, { // Corrected to /api/macros/
-        headers: { Authorization: `Bearer ${storedToken}` },
+      const historyRes = await axios.get(`${BASE_URL}/api/macro/${userIdToFetch}/history`, {
+        headers: { Authorization: `Bearer ${authToken}` },
       });
       setMacroHistory(historyRes.data.data || []);
 
@@ -142,18 +130,25 @@ const Profile = () => {
       if (err.response) {
         console.error("API Response Error Data:", err.response.data);
         console.error("API Response Status:", err.response.status);
-        console.error("API Response Headers:", err.response.headers);
       }
       Alert.alert('Error', err.response?.data?.error || 'Failed to load profile data. Please try again later.');
+
+      if (err.response?.status === 401) {
+        // If the token is truly invalid for the profile fetch, log out
+        authLogout();
+      }
+
     } finally {
       setRefreshing(false);
     }
-  }, [routeUserId]); // routeUserId is still a dependency
+  }, [routeUserId, authToken, authUser?.id, authLoading, authLogout]); // Dependencies for useCallback
 
   useEffect(() => {
-    initialize();
-  }, [initialize]);
-
+    // Only call initialize if auth is not loading and we have a user/token
+    if (!authLoading && authUser && authToken) {
+      initialize();
+    }
+  }, [initialize, authLoading, authUser, authToken]); // Depend on initialize and auth state
 
   const pickImage = async () => {
     if (!isMyProfile) return;
@@ -182,7 +177,8 @@ const Profile = () => {
   };
 
   const handleSubmit = async () => {
-    if (!token || !isMyProfile) {
+    // Use authToken from useAuth
+    if (!authToken || !isMyProfile) {
       Alert.alert('Error', 'Unauthorized action.');
       return;
     }
@@ -211,18 +207,21 @@ const Profile = () => {
           type,
         } as any);
       } else if (avatar === null) {
-        formData.append('avatar', '');
+        formData.append('avatar', ''); // Explicitly send empty string if avatar cleared
       }
 
-      await axios.put(`${BASE_URL}/api/profile/profile`, formData, {
+      await axios.put(`${BASE_URL}/api/profile/profile`, formData, { // Assuming this is your profile update endpoint
         headers: {
           'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${authToken}`,
         },
       });
 
       Alert.alert('Success', 'Your profile has been updated successfully!');
       setIsEditingGoals(false);
+      // --- CRITICAL CHANGE: Refresh the user profile in AuthContext ---
+      await refreshUserProfile();
+      // After refreshing AuthContext, re-initialize local state to show the latest data
       initialize();
     } catch (err: any) {
       console.error("Profile update failed:", err);
@@ -257,6 +256,28 @@ const Profile = () => {
   };
 
   const hasGoalsSetForViewedProfile = (+form.calories_goal > 0 || +form.protein_goal > 0 || +form.carbs_goal > 0 || +form.fat_goal > 0);
+
+  // Show a loading indicator if AuthContext is still loading
+  if (authLoading) {
+    return (
+      <View style={styles.centeredLoading}>
+        <Progress.CircleSnail color={[appColors.primary, appColors.secondary]} size={50} thickness={5} />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
+
+  // Handle cases where the user or token is not available after authLoading
+  if (!authUser || !authToken) {
+    return (
+      <View style={styles.centeredLoading}>
+        <Text style={styles.errorText}>Please log in to view this profile.</Text>
+        <Button mode="contained" onPress={authLogout} style={styles.loginButton}>
+          Log In
+        </Button>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -466,6 +487,7 @@ const Profile = () => {
           )}
         </Card>
 
+        {/* This button should likely be for general profile updates, not just when not editing goals */}
         {!isEditingGoals && isMyProfile && (
           <Button
             mode="contained"
@@ -707,7 +729,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
+  centeredLoading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: appColors.background,
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: appColors.textSecondary,
+  },
+  errorText: {
+    fontSize: 16,
+    color: appColors.error,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  loginButton: {
+    marginTop: 10,
+    backgroundColor: appColors.primary,
+  },
 });
-
 
 export default Profile;
