@@ -1,3 +1,5 @@
+
+// ChatBotScreen.tsx
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -9,6 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { mealApi } from "@/apis/mealApi";
+import { botApi } from "@/apis/botApi";
 import { Meal } from "@/types/meal";
 import TodayMeals from "./components/todayMeals";
 
@@ -38,7 +41,7 @@ export default function ChatBotScreen() {
     setInvalid("");
 
     try {
-      const data = await mealApi.estimateNutrition(prompt);
+      const data = await botApi.sendPrompt(prompt);
       setNutrition(data);
     } catch (error: any) {
       setInvalid(error.message || "Failed to fetch nutrition info");
