@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 const path = require('path');
-
+const { redisClient } = require('../utils/redis');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 exports.uploadMeal = async (req, res) => {
@@ -141,6 +141,8 @@ exports.uploadMeal = async (req, res) => {
       .eq('id', userId);
 
     if (profileUpdateError) throw profileUpdateError;
+    await redisClient.del(`user_profile:${userId}`);
+    console.log(`🧹 Cleared Redis cache for profile of user ${userId}`);
 
     return res.status(200).json({ message: 'Meal uploaded and profile updated successfully!' });
   } catch (error) {

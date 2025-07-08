@@ -9,17 +9,16 @@ import {
   SafeAreaView,
   RefreshControl,
   Platform,
-  // Dimensions, // Removed as it's now in MacroHistoryChart
 } from 'react-native';
-import { Avatar, Button, TextInput, useTheme, Card, Title, Paragraph, Divider } from 'react-native-paper';
+import { Avatar, Button, TextInput, useTheme, Card } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 import * as Progress from 'react-native-progress';
 import { Ionicons } from '@expo/vector-icons';
-// import { LineChart } from 'react-native-chart-kit'; // Removed
+import { useRoute } from '@react-navigation/native';
 import { BASE_URL } from '@/config';
-import MacroHistoryChart from '../components/MacroHistoryChart'; // Import the new component
+import MacroHistoryChart from '../components/MacroHistoryChart';
 
 // --- Define appColors outside the component for consistent access ---
 const appColors = {
@@ -35,16 +34,19 @@ const appColors = {
   info: '#0ea5e9', // Sky blue (for carbs progress)
   warning: '#facc15', // Yellow (for fat progress)
   placeholder: '#A0A0A0', // Placeholder text
-  // Removed chartLineX colors as they are now in MacroHistoryChart
 };
 // -----------------------------------------------------------------------------
 
-// Removed DailyMacroHistory interface as it's now in MacroHistoryChart.tsx
-// interface DailyMacroHistory { ... }
-
 const Profile = () => {
   const theme = useTheme();
+  const route = useRoute();
 
+  // FIX: More robust access to route.params.id
+  // Ensure route.params is an object (even empty) before destructuring 'id'
+  const routeUserId = (route.params as { id?: string } | undefined)?.id;
+
+  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(null);
+  const [isMyProfile, setIsMyProfile] = useState(false);
   const [form, setForm] = useState({
     username: '',
     display_name: '',
@@ -64,7 +66,7 @@ const Profile = () => {
   const [avatar, setAvatar] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState<string | null>(null);
-  const [macroHistory, setMacroHistory] = useState<any[]>([]); // Keep as any[] or define a shared type if needed
+  const [macroHistory, setMacroHistory] = useState<any[]>([]);
   const [isEditingGoals, setIsEditingGoals] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -79,8 +81,35 @@ const Profile = () => {
       }
       setToken(storedToken);
 
+      // Get logged-in user's ID from the token
+      const authRes = await axios.get(`${BASE_URL}/api/auth/user`, {
+        headers: { Authorization: `Bearer ${storedToken}` },
+      });
+
+      // Log the entire response data to help debug its exact structure
+      console.log("Auth response data:", authRes.data);
+
+      let user: { id: string } | null = null;
+      if (authRes.data && authRes.data.user && typeof authRes.data.user.id === 'string') {
+        user = authRes.data.user;
+      } else if (authRes.data && typeof authRes.data.id === 'string') {
+        user = authRes.data;
+      }
+
+      if (!user || !user.id) {
+        console.error("Auth response did not contain a valid user object or user ID:", user);
+        Alert.alert('Authentication Error', 'Could not verify user. Please log in again.');
+        setRefreshing(false);
+        return;
+      }
+      setLoggedInUserId(user.id);
+
+      // Determine the user ID to fetch: routeUserId if present, otherwise loggedInUserId (for own profile)
+      const userIdToFetch = routeUserId || user.id;
+      setIsMyProfile(userIdToFetch === user.id);
+
       // --- Fetch Profile Data ---
-      const profileRes = await axios.get(`${BASE_URL}/api/profile/me`, {
+      const profileRes = await axios.get(`${BASE_URL}/api/profile/${userIdToFetch}`, {
         headers: { Authorization: `Bearer ${storedToken}` },
       });
       const profileData = profileRes.data;
@@ -102,19 +131,24 @@ const Profile = () => {
       });
       setAvatar(profileData.avatar_url || null);
 
-      // --- Fetch Macro History Data ---
-      const historyRes = await axios.get(`${BASE_URL}/api/macro/history`, {
+      // --- Fetch Macro History Data (for any viewed profile) ---
+      const historyRes = await axios.get(`${BASE_URL}/api/macro/${userIdToFetch}/history`, { // Corrected to /api/macros/
         headers: { Authorization: `Bearer ${storedToken}` },
       });
       setMacroHistory(historyRes.data.data || []);
 
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to load profile or macro history:", err);
-      Alert.alert('Error', 'Failed to load profile data. Please try again later.');
+      if (err.response) {
+        console.error("API Response Error Data:", err.response.data);
+        console.error("API Response Status:", err.response.status);
+        console.error("API Response Headers:", err.response.headers);
+      }
+      Alert.alert('Error', err.response?.data?.error || 'Failed to load profile data. Please try again later.');
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [routeUserId]); // routeUserId is still a dependency
 
   useEffect(() => {
     initialize();
@@ -122,6 +156,8 @@ const Profile = () => {
 
 
   const pickImage = async () => {
+    if (!isMyProfile) return;
+
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission Required', 'Permission to access media library is needed to set your avatar!');
@@ -141,12 +177,13 @@ const Profile = () => {
   };
 
   const handleChange = (name: string, value: string) => {
+    if (!isMyProfile) return;
     setForm({ ...form, [name]: value });
   };
 
   const handleSubmit = async () => {
-    if (!token) {
-      Alert.alert('Error', 'Missing authentication token. Please log in.');
+    if (!token || !isMyProfile) {
+      Alert.alert('Error', 'Unauthorized action.');
       return;
     }
 
@@ -219,7 +256,7 @@ const Profile = () => {
     );
   };
 
-  const hasGoalsSet = +form.calories_goal > 0 || +form.protein_goal > 0 || +form.carbs_goal > 0 || +form.fat_goal > 0;
+  const hasGoalsSetForViewedProfile = (+form.calories_goal > 0 || +form.protein_goal > 0 || +form.carbs_goal > 0 || +form.fat_goal > 0);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -233,16 +270,15 @@ const Profile = () => {
           />
         }
       >
-        {/* Profile Header */}
         <Card style={styles.sectionCard}>
           <View style={styles.profileHeader}>
-            <TouchableOpacity onPress={pickImage} style={styles.avatarWrapper}>
+            <TouchableOpacity onPress={pickImage} style={styles.avatarWrapper} disabled={!isMyProfile}>
               {avatar ? (
                 <Avatar.Image size={100} source={{ uri: avatar }} style={styles.avatar} />
               ) : (
                 <Avatar.Icon size={100} icon="account-circle-outline" style={styles.avatar} color={appColors.primary} />
               )}
-              <Text style={styles.changeAvatarText}>Change Profile Photo</Text>
+              {isMyProfile && <Text style={styles.changeAvatarText}>Change Profile Photo</Text>}
             </TouchableOpacity>
 
             <View style={styles.profileInfo}>
@@ -255,6 +291,7 @@ const Profile = () => {
                 outlineColor={appColors.border}
                 activeOutlineColor={appColors.primary}
                 theme={{ colors: { primary: appColors.primary, text: appColors.textPrimary, placeholder: appColors.placeholder } }}
+                editable={isMyProfile}
               />
               <TextInput
                 label="Username"
@@ -267,6 +304,7 @@ const Profile = () => {
                 autoCapitalize="none"
                 autoCorrect={false}
                 theme={{ colors: { primary: appColors.primary, text: appColors.textPrimary, placeholder: appColors.placeholder } }}
+                editable={isMyProfile}
               />
               <TextInput
                 label="Bio"
@@ -279,12 +317,12 @@ const Profile = () => {
                 outlineColor={appColors.border}
                 activeOutlineColor={appColors.primary}
                 theme={{ colors: { primary: appColors.primary, text: appColors.textPrimary, placeholder: appColors.placeholder } }}
+                editable={isMyProfile}
               />
             </View>
           </View>
         </Card>
 
-        {/* Contact Information */}
         <Text style={styles.sectionTitle}>Contact & Location</Text>
         <Card style={styles.sectionCard}>
           <TextInput
@@ -297,23 +335,24 @@ const Profile = () => {
             activeOutlineColor={appColors.primary}
             left={<TextInput.Icon icon="map-marker-outline" color={appColors.textSecondary} />}
             theme={{ colors: { primary: appColors.primary, text: appColors.textPrimary, placeholder: appColors.placeholder } }}
+            editable={isMyProfile}
           />
           <TextInput
             label="Website"
             value={form.website}
             onChangeText={(text) => handleChange('website', text)}
-            style={styles.input}
             mode="outlined"
+            style={styles.input}
             outlineColor={appColors.border}
             activeOutlineColor={appColors.primary}
             autoCapitalize="none"
             left={<TextInput.Icon icon="web" color={appColors.textSecondary} />}
             theme={{ colors: { primary: appColors.primary, text: appColors.textPrimary, placeholder: appColors.placeholder } }}
+            editable={isMyProfile}
           />
         </Card>
 
-        {/* Macros Progress Section */}
-        {hasGoalsSet && (
+        {hasGoalsSetForViewedProfile ? (
           <>
             <Text style={styles.sectionTitle}>Today's Macros Progress</Text>
             <View style={styles.macrosProgressContainer}>
@@ -323,26 +362,27 @@ const Profile = () => {
               {renderMacroProgress('Fat', +form.daily_fat || 0, +form.fat_goal || 0, appColors.warning)}
             </View>
           </>
-        )}
-        {!hasGoalsSet && (
+        ) : (
           <View style={styles.emptyStateCard}>
             <Ionicons name="bulb-outline" size={30} color={appColors.placeholder} />
-            <Text style={styles.emptyStateText}>Set your macro goals to track your daily progress here!</Text>
+            <Text style={styles.emptyStateText}>
+              {isMyProfile ? "Set your macro goals to track your daily progress here!" : "This user has not set their macro goals."}
+            </Text>
           </View>
         )}
 
-
-        {/* Macro Goals Section */}
         <View style={styles.goalsHeader}>
           <Text style={styles.sectionTitle}>Macro Goals</Text>
-          <TouchableOpacity onPress={() => setIsEditingGoals(!isEditingGoals)} style={styles.editButton}>
-            <Ionicons name={isEditingGoals ? "checkmark-circle-outline" : "pencil-outline"} size={20} color={appColors.primary} />
-            <Text style={[styles.editButtonText, { color: appColors.primary }]}>{isEditingGoals ? "Done" : "Edit Goals"}</Text>
-          </TouchableOpacity>
+          {isMyProfile && (
+            <TouchableOpacity onPress={() => setIsEditingGoals(!isEditingGoals)} style={styles.editButton}>
+              <Ionicons name={isEditingGoals ? "checkmark-circle-outline" : "pencil-outline"} size={20} color={appColors.primary} />
+              <Text style={[styles.editButtonText, { color: appColors.primary }]}>{isEditingGoals ? "Done" : "Edit Goals"}</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <Card style={styles.sectionCard}>
-          {!isEditingGoals ? (
+          {!isEditingGoals || !isMyProfile ? (
             <View style={styles.goalsDisplay}>
               <View style={styles.goalItem}>
                 <Text style={styles.goalLabel}>Calories Goal:</Text>
@@ -373,6 +413,7 @@ const Profile = () => {
                 outlineColor={appColors.border}
                 activeOutlineColor={appColors.primary}
                 theme={{ colors: { primary: appColors.primary, text: appColors.textPrimary, placeholder: appColors.placeholder } }}
+                editable={isMyProfile}
               />
               <TextInput
                 label="Protein Goal (g)"
@@ -384,6 +425,7 @@ const Profile = () => {
                 outlineColor={appColors.border}
                 activeOutlineColor={appColors.primary}
                 theme={{ colors: { primary: appColors.primary, text: appColors.textPrimary, placeholder: appColors.placeholder } }}
+                editable={isMyProfile}
               />
               <TextInput
                 label="Carbs Goal (g)"
@@ -395,6 +437,7 @@ const Profile = () => {
                 outlineColor={appColors.border}
                 activeOutlineColor={appColors.primary}
                 theme={{ colors: { primary: appColors.primary, text: appColors.textPrimary, placeholder: appColors.placeholder } }}
+                editable={isMyProfile}
               />
               <TextInput
                 label="Fat Goal (g)"
@@ -406,12 +449,13 @@ const Profile = () => {
                 outlineColor={appColors.border}
                 activeOutlineColor={appColors.primary}
                 theme={{ colors: { primary: appColors.primary, text: appColors.textPrimary, placeholder: appColors.placeholder } }}
+                editable={isMyProfile}
               />
               <Button
                 mode="contained"
                 onPress={handleSubmit}
                 loading={loading}
-                disabled={loading}
+                disabled={loading || !isMyProfile}
                 style={styles.saveGoalsButton}
                 labelStyle={styles.buttonLabel}
                 contentStyle={styles.buttonContent}
@@ -422,13 +466,12 @@ const Profile = () => {
           )}
         </Card>
 
-        {/* General Save Profile Button */}
-        {!isEditingGoals && (
+        {!isEditingGoals && isMyProfile && (
           <Button
             mode="contained"
             onPress={handleSubmit}
             loading={loading}
-            disabled={loading}
+            disabled={loading || !isMyProfile}
             style={styles.saveProfileButton}
             labelStyle={styles.buttonLabel}
             contentStyle={styles.buttonContent}
@@ -437,17 +480,24 @@ const Profile = () => {
           </Button>
         )}
 
-        {/* Daily Macro History Chart - Now a component */}
         <Text style={styles.sectionTitle}>Daily Macro History</Text>
         <Card style={styles.graphCard}>
-          <MacroHistoryChart macroHistory={macroHistory} />
+          {macroHistory.length > 0 ? (
+            <MacroHistoryChart macroHistory={macroHistory} />
+          ) : (
+            <View style={styles.emptyStateCard}>
+              <Ionicons name="stats-chart-outline" size={30} color={appColors.placeholder} />
+              <Text style={styles.emptyStateText}>
+                {isMyProfile ? "No macro history data available. Start logging your daily macros!" : "No macro history data available for this user."}
+              </Text>
+            </View>
+          )}
         </Card>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-// --- Stylesheet definition ---
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -620,7 +670,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: appColors.cardBackground,
   },
-  // --- Removed Chart Specific Styles from Profile.tsx ---
   graphCard: {
     marginBottom: 20,
     borderRadius: 12,
@@ -630,9 +679,8 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     backgroundColor: appColors.cardBackground,
-    // Removed paddingVertical here as it's now handled by MacroHistoryChart's internal container
   },
-  noGraphData: { // Kept for empty state of graphCard if MacroHistoryChart is not used
+  noGraphData: {
     textAlign: 'center',
     paddingVertical: 30,
     color: appColors.placeholder,
@@ -660,5 +708,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 });
+
 
 export default Profile;

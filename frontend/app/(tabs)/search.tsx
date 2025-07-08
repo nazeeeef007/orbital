@@ -17,6 +17,8 @@ import { BASE_URL } from '@/config';
 import SearchResultCard from '../../components/searchResult';
 import RecommendationScreen from '../components/recommendationScreen';
 import { Ionicons } from '@expo/vector-icons';
+// Import useNavigation to pass it down if needed, though SearchResultCard now uses it directly
+// import { useNavigation } from '@react-navigation/native'; // Not strictly needed here anymore, but good to know
 
 let debounceTimer: NodeJS.Timeout;
 
@@ -42,6 +44,8 @@ export default function SearchScreen() {
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // const navigation = useNavigation(); // If you needed to pass navigation down, you'd uncomment this
 
   useEffect(() => {
     if (!query.trim()) {
@@ -147,6 +151,9 @@ export default function SearchScreen() {
             <FlatList
               data={results}
               keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+              // No need to pass onPress here, as SearchResultCard handles navigation internally for 'users' type.
+              // If you had specific meal click logic in SearchScreen, you would pass it like:
+              // renderItem={({ item }) => <SearchResultCard item={item} type={type} onPress={type === 'meals' ? handleMealPress : undefined} />}
               renderItem={({ item }) => <SearchResultCard item={item} type={type} />}
               ListEmptyComponent={
                 !loading && query.trim().length > 0 && results.length === 0 ? (

@@ -55,12 +55,19 @@ const logout = async (req, res) => {
 
   try {
     // Supabase does not have a backend signOut, but you can revoke the token:
-    const { error } = await supabase.auth.admin.signOut(token);
+    // Note: supabase.auth.admin.signOut() expects a user ID, not a token.
+    // If you want to invalidate a session from the server, you'd typically delete the session.
+    // For client-side logout, just removing the token from SecureStore is usually sufficient.
+    // If you specifically need to revoke a token from the server, you'd need to find the session ID
+    // associated with the token and then use `supabase.auth.admin.deleteSession(sessionId)`.
+    // For now, I'll remove the `signOut` call as it's likely not doing what's intended here.
+    // The client-side `logout` function in `useAuth` handles clearing the token.
 
-    if (error) {
-      console.error('Logout failed:', error.message);
-      return res.status(500).json({ error: 'Failed to log out' });
-    }
+    // If you had a mechanism to get session_id from token:
+    // const { data: { session }, error: sessionError } = await supabase.auth.getSession(token);
+    // if (session && !sessionError) {
+    //   await supabase.auth.admin.deleteSession(session.id);
+    // }
 
     return res.status(200).json({ message: 'Logged out successfully' });
   } catch (err) {
@@ -69,8 +76,22 @@ const logout = async (req, res) => {
   }
 };
 
+// NEW FUNCTION: Get authenticated user's details
+const getUser = async (req, res) => {
+  // The 'authenticate' middleware already populates req.user
+  // req.user will contain the user object from Supabase if authentication was successful
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized: User not found in request' });
+  }
+  console.log("got user!");
+  // Return the user object directly as expected by Profile.tsx
+  return res.status(200).json({ user: req.user });
+};
+
+
 module.exports = {
   signup,
   login,
-  logout
+  logout,
+  getUser // Export the new function
 };

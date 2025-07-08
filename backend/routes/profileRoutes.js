@@ -13,6 +13,6 @@ router.put(
   profileController.updateProfile
 );
 
-router.get('/me', authenticate, profileController.getProfile);
+router.get('/:id', authenticate, profileController.getProfile);
 
 module.exports = router;

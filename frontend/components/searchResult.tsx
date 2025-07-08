@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDistanceToNowStrict } from 'date-fns';
+import { useNavigation } from '@react-navigation/native'; // Import useNavigation
 
 // --- Consistent Color Palette (Refined slightly for sleekness) ---
 const Colors = {
@@ -29,12 +30,20 @@ const Colors = {
 type Props = {
   item: any; // Ideally, define specific interfaces for User and Meal here
   type: 'users' | 'meals';
-  onPress?: (item: any, type: 'users' | 'meals') => void;
+  onPress?: (item: any, type: 'users' | 'meals') => void; // Keep this prop for potential external handlers
 };
 
 export default function SearchResultCard({ item, type, onPress }: Props) {
+  const navigation = useNavigation(); // Get the navigation object
+
   const handlePress = () => {
-    if (onPress) {
+    if (type === 'users') {
+      // Navigate to the Profile screen, passing the user's ID as a parameter
+      // The 'profile' screen in app/(tabs)/_layout.tsx is configured to handle this.
+      // It will navigate to the 'profile' tab and the Profile component will pick up the 'id' param.
+      navigation.navigate('profile', { id: item.id });
+    } else if (onPress) {
+      // If it's a meal or any other type, and an external onPress handler is provided, use it.
       onPress(item, type);
     }
   };
@@ -164,7 +173,7 @@ export default function SearchResultCard({ item, type, onPress }: Props) {
               <Text style={styles.mealMetaText}>${parseFloat(item.price).toFixed(2)}</Text>
             </View>
           )}
-           {item.location && (
+            {item.location && (
               <View style={styles.metaTag}>
                 <Ionicons name="navigate-outline" size={14} color={Colors.primary} />
                 <Text style={styles.mealMetaText}>{item.location}</Text>

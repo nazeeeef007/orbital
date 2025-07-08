@@ -4,6 +4,17 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 
 const path = require('path');
 const fs = require('fs');
+const { redisClient } = require('../utils/redis'); // ✅ import Redis client
+
+// Helper: Calculate TTL until next 12AM SGT
+function secondsUntilMidnightSGT() {
+  const now = new Date();
+  const utc8 = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Singapore' }));
+  const nextMidnight = new Date(utc8);
+  nextMidnight.setDate(utc8.getDate() + 1);
+  nextMidnight.setHours(0, 0, 0, 0);
+  return Math.floor((nextMidnight - utc8) / 1000);
+}
 
 
 // ... (previous imports and supabase client setup)
@@ -153,24 +164,95 @@ const updateProfile = async (req, res) => {
 
 
 
+// const getProfile = async (req, res) => {
+//   console.log("reached getProfile!");
+//   try {
+//     // Get the target user ID from the URL parameters
+//     const targetUserId = req.params.id;
+
+//     // Optional: You could add a check here if req.user.id is authorized to view targetUserId's profile
+//     // For now, any authenticated user can view any profile.
+
+//     console.log(`Getting profile for user ID: ${targetUserId}`);
+//     const { data: profile, error } = await supabase
+//       .from('profiles')
+//       .select(
+//         'id, username, display_name, bio, location, website, avatar_url, ' +
+//         'daily_calories, daily_protein, daily_carbs, daily_fat, ' +
+//         'calories_goal, protein_goal, carbs_goal, fat_goal'
+//       )
+//       .eq('id', targetUserId) // Use targetUserId from params
+//       .single();
+
+//     if (error) {
+//       console.error('Error fetching profile:', error);
+//       // If no profile is found for the given ID (PGRST116), return 404
+//       if (error.code === 'PGRST116') {
+//         return res.status(404).json({ error: 'Profile not found' });
+//       }
+//       return res.status(500).json({ error: 'Failed to fetch profile' });
+//     }
+
+//     // Return the profile data, which now includes the 'id' field
+//     return res.json(profile);
+//   } catch (err) {
+//     console.error('Unexpected error in getProfile:', err);
+//     return res.status(500).json({ error: 'Server error' });
+//   }
+// };
+
+
+
 const getProfile = async (req, res) => {
-  console.log("reached getProfile!")
+  console.log("reached getProfile!");
+
+  const targetUserId = req.params.id;
+  const isSelf = req.user && req.user.id === targetUserId;
+
+  const cacheKey = `user_profile:${targetUserId}`;
+
+  // ✅ Try cache if user is requesting their own profile
+  if (isSelf) {
+    try {
+      const cached = await redisClient.get(cacheKey);
+      if (cached) {
+        console.log(`💾 Returned cached profile for user ${targetUserId}`);
+        return res.json(JSON.parse(cached));
+      }
+    } catch (err) {
+      console.error('❌ Redis GET failed:', err.message);
+    }
+  }
+
   try {
-    const userId = req.user.id;
-    console.log("getting profile");
+    console.log(`Getting profile for user ID: ${targetUserId}`);
     const { data: profile, error } = await supabase
       .from('profiles')
       .select(
-        'username, display_name, bio, location, website, avatar_url, ' +
+        'id, username, display_name, bio, location, website, avatar_url, ' +
         'daily_calories, daily_protein, daily_carbs, daily_fat, ' +
         'calories_goal, protein_goal, carbs_goal, fat_goal'
       )
-      .eq('id', userId)
+      .eq('id', targetUserId)
       .single();
 
     if (error) {
       console.error('Error fetching profile:', error);
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Profile not found' });
+      }
       return res.status(500).json({ error: 'Failed to fetch profile' });
+    }
+
+    // ✅ Cache the profile if it’s for the current user
+    if (isSelf) {
+      try {
+        const ttl = secondsUntilMidnightSGT();
+        await redisClient.setEx(cacheKey, ttl, JSON.stringify(profile));
+        console.log(`📦 Cached profile for user ${targetUserId} (expires in ${ttl}s)`);
+      } catch (err) {
+        console.error('❌ Redis SETEX failed:', err.message);
+      }
     }
 
     return res.json(profile);
