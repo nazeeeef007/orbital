@@ -1,6 +1,4 @@
-const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = require('../utils/supabaseClient');
 
 // in the future might need to update this to make it moptimised
 const getUserMeals = async (req, res) => {
