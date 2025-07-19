@@ -12,6 +12,7 @@ const uploadRoutes   = require('./routes/uploadRoutes');
 const mealRoutes     = require('./routes/mealRoutes');
 const searchRoutes   = require('./routes/searchRoutes');
 const macroRoutes    = require('./routes/macroRoutes');
+const ingredientsRoutes = require('./routes/ingredientsRoutes');
 
 app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json({ limit: '2mb' }));
@@ -23,5 +24,6 @@ app.use('/api/upload',   uploadRoutes);
 app.use('/api/meals',    mealRoutes);
 app.use('/api/search',   searchRoutes);
 app.use('/api/macro',    macroRoutes);
+app.use('/api/ingredients', ingredientsRoutes);
 
 module.exports = app; // 👈 Export the app so tests can import it

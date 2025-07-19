@@ -20,6 +20,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="ingredients" // Corresponds to app/(tabs)/upload.tsx
+        options={{
+          title: 'Ingredients',
+          tabBarIcon: ({ color }) => <Ionicons name="nutrition-outline"  size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="search" // Corresponds to app/(tabs)/search.tsx
         options={{
           title: 'Search',

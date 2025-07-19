@@ -1,11 +1,13 @@
-// hooks/useAuth.tsx
+// --- 1. Update hooks/useAuth.tsx ---
+// This file will be modified to fetch and store ingredients globally.
+
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
-import { Alert } from 'react-native';
-import { BASE_URL } from '@/config'; // your backend URL
-import { useRouter } from 'expo-router'; // IMPORT THIS!
-
+import { Alert, Platform } from 'react-native'; // Added Platform for potential future use
+import { BASE_URL } from '@/config';
+import { useRouter } from 'expo-router';
+import type { Ingredient } from '@/types/Ingredients';
 // --- Interfaces ---
 interface UserProfile {
   id: string;
@@ -25,15 +27,17 @@ interface UserProfile {
   daily_fat: number | null;
 }
 
+
+
 interface AuthContextType {
   authToken: string | null;
   user: UserProfile | null;
   loading: boolean;
   login: (token: string) => Promise<void>;
   logout: () => Promise<void>;
-  // Changed the signature to indicate it can be called without an explicit token
-  // as it will use the authToken from state.
   refreshUserProfile: () => Promise<void>;
+  ingredients: Ingredient[] | null; // New: Store all ingredients
+  fetchIngredients: () => Promise<void>; // New: Function to fetch ingredients
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,25 +46,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter(); // Initialize useRouter here
-  // Use useCallback for fetchUserProfile to memoize it and prevent unnecessary re-creations.
-  // It now relies on the `authToken` from the state, making it callable externally
-  // without needing to pass the token explicitly.
+  const [ingredients, setIngredients] = useState<Ingredient[] | null>(null); // New state for ingredients
+  const router = useRouter();
+
+  // Memoized function to fetch user profile
   const fetchUserProfile = useCallback(async () => {
-    // Only attempt to fetch if authToken exists
     if (!authToken) {
       console.warn('fetchUserProfile called without an authToken.');
-      setUser(null); // Ensure user is null if no token is present
+      setUser(null);
       return;
     }
-
     try {
-      // First, get basic user info (including ID)
       const authRes = await axios.get(`${BASE_URL}/api/auth/user`, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
 
-      // Safely extract userId, prioritize authRes.data.user.id then authRes.data.id
       const userId =
         typeof authRes.data.user?.id === 'string'
           ? authRes.data.user.id
@@ -73,7 +73,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Invalid authentication response: User ID missing.');
       }
 
-      // Then, fetch the full profile using the user ID
       const profileRes = await axios.get<UserProfile>(
         `${BASE_URL}/api/profile/${userId}`,
         { headers: { Authorization: `Bearer ${authToken}` } }
@@ -81,45 +80,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(profileRes.data);
     } catch (err: any) {
       console.error('Failed to fetch user profile:', err.message || err);
-      setUser(null); // Clear user profile on error
+      setUser(null);
       if (err.response?.status === 401) {
         Alert.alert("Session Expired", "Your session has expired. Please log in again.");
-        // Token is invalid, clear it and log out
         await SecureStore.deleteItemAsync('authToken');
         setAuthToken(null);
-        // Do not throw here, let the component handle the logout flow if needed
       }
-      // Re-throw if it's an error we want calling components to potentially catch
       throw err;
     }
-  }, [authToken]); // Dependency: re-create if authToken changes
+  }, [authToken]);
 
-  // Login
+  // New: Memoized function to fetch all ingredients
+  const fetchIngredients = useCallback(async () => {
+    if (!authToken) {
+      console.warn('fetchIngredients called without an authToken.');
+      setIngredients(null);
+      return;
+    }
+    try {
+      // Using the /api/ingredients endpoint to get all ingredients
+      const response = await axios.get<Ingredient[]>(`${BASE_URL}/api/ingredients`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      setIngredients(response.data);
+    } catch (err: any) {
+      console.error('Failed to fetch ingredients:', err.message || err);
+      setIngredients(null);
+      if (err.response?.status === 401) {
+        Alert.alert("Session Expired", "Your session has expired. Please log in again.");
+        await SecureStore.deleteItemAsync('authToken');
+        setAuthToken(null);
+        setUser(null);
+      }
+      throw err;
+    }
+  }, [authToken]); // Re-create if authToken changes
+
+  // Login function
   const login = useCallback(
     async (token: string) => {
-      setLoading(true); // Set loading true at the start of login
+      setLoading(true);
       try {
         await SecureStore.setItemAsync('authToken', token);
         setAuthToken(token);
-        // Call fetchUserProfile without passing token directly, it will use the state's authToken
-        await fetchUserProfile();
+        // Fetch user profile and ingredients after setting the token
+        await Promise.all([
+          fetchUserProfile(),
+          fetchIngredients()
+        ]);
       } catch (e) {
         console.error('Login process failed:', e);
         Alert.alert('Login Error', 'Failed to log in. Please check your credentials or try again.');
-        await SecureStore.deleteItemAsync('authToken'); // Clear token on login failure
+        await SecureStore.deleteItemAsync('authToken');
         setAuthToken(null);
         setUser(null);
-        throw e; // Re-throw to allow login screen to handle
+        setIngredients(null); // Clear ingredients on login failure
+        throw e;
       } finally {
-        setLoading(false); // Always set loading to false after login attempt
+        setLoading(false);
       }
     },
-    [fetchUserProfile] // Dependency: fetchUserProfile
+    [fetchUserProfile, fetchIngredients]
   );
 
-  // Logout
+  // Logout function
   const logout = useCallback(async () => {
-    setLoading(true); // Indicate loading during logout
+    setLoading(true);
     try {
       await SecureStore.deleteItemAsync('authToken');
     } catch (e) {
@@ -128,35 +154,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setAuthToken(null);
       setUser(null);
-      setLoading(false); // Set loading to false after logout attempt
+      setIngredients(null); // Clear ingredients on logout
+      setLoading(false);
       router.replace('/login');
     }
   }, []);
 
-  // Bootstrap: run once on mount to check for existing token and fetch profile
+  // Bootstrap: run once on mount to check for existing token and fetch data
   useEffect(() => {
-    const loadAuthData = async () => {
-      setLoading(true); // Start loading immediately
+    const loadAuthAndAppData = async () => {
+      setLoading(true);
       try {
         const token = await SecureStore.getItemAsync('authToken');
         if (token) {
           setAuthToken(token);
-          // Directly call the memoized fetchUserProfile
-          await fetchUserProfile();
+          // Fetch user profile and ingredients concurrently
+          await Promise.all([
+            fetchUserProfile(),
+            fetchIngredients()
+          ]);
         }
       } catch (e) {
-        console.error('Authentication bootstrap error:', e);
-        // Clear any potentially corrupted state
+        console.error('Authentication or data bootstrap error:', e);
         setAuthToken(null);
         setUser(null);
+        setIngredients(null);
       } finally {
-        setLoading(false); // Always set loading to false after bootstrap
+        setLoading(false);
       }
     };
-    loadAuthData();
-  }, [fetchUserProfile]); // Dependency: fetchUserProfile (ensures it's the latest memoized version)
+    loadAuthAndAppData();
+  }, [fetchUserProfile, fetchIngredients]); // Dependencies
 
-  // Memoize the context value to prevent unnecessary re-renders of consumers
+  // Memoize the context value
   const contextValue = useMemo(
     () => ({
       authToken,
@@ -164,9 +194,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       loading,
       login,
       logout,
-      refreshUserProfile: fetchUserProfile, // Expose the memoized fetchUserProfile as refreshUserProfile
+      refreshUserProfile: fetchUserProfile,
+      ingredients, // Expose ingredients
+      fetchIngredients, // Expose fetchIngredients
     }),
-    [authToken, user, loading, login, logout, fetchUserProfile] // Add fetchUserProfile to dependencies
+    [authToken, user, loading, login, logout, fetchUserProfile, ingredients, fetchIngredients]
   );
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
