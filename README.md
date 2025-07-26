@@ -86,17 +86,6 @@ The backend is a robust **Node.js server powered by Express.js**, providing a RE
     2.  Install dependencies: `npm install`
     3.  Start the backend server: `node app.js`
 
-### **3. Bot Microservice: Node.js + OpenAI API**
-
-A specialized **Node.js microservice** is responsible for the AI-driven chat functionality, providing real-time macro information and dietary insights.
-
-* **Core Technologies:** Node.js, OpenAI API.
-* **Purpose:** Interpreting natural language queries related to food and nutrition, leveraging large language models to provide accurate macro breakdowns and suggestions.
-* **Running the Bot Microservice:**
-    1.  Navigate to the `bot-microservice` directory: `cd bot-microservice`
-    2.  Install dependencies: `npm install`
-    3.  Start the bot server: `node bot.js`
-
 ---
 
 ## ⚙️ Initial Setup & Configuration (Crucial for First Run)
