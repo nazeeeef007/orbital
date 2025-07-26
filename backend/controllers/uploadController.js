@@ -11,45 +11,54 @@ exports.uploadMeal = async (req, res) => {
       prep_time_mins, price, location
     } = req.body;
 
-    // Safely extract files
-    const mealRaw = req.files['meal_image'];
-    const recipeRaw = req.files['recipe_image'];
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // --- CRITICAL FIX: Safely access req.files and its properties ---
+    // Check if req.files exists before trying to access its properties.
+    // If req.files doesn't exist, mealRaw/recipeRaw will be undefined,
+    // which then correctly makes mealImage/recipeImage undefined.
+    const mealRaw = req.files?.['meal_image']; // Use optional chaining
+    const recipeRaw = req.files?.['recipe_image']; // Use optional chaining
+
+    // This logic is mostly fine, it correctly extracts the first file or keeps it undefined/null
     const mealImage = Array.isArray(mealRaw) ? mealRaw[0] : mealRaw;
     const recipeImage = Array.isArray(recipeRaw) ? recipeRaw[0] : recipeRaw;
-    
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: 'User not authenticated' });
-   console.log("req.files:", req.files['meal_image']);
-    // Validate required fields
+
+    console.log("mealImage from req.files:", mealImage); // Now this won't error if req.files is undefined
+
+    // Validate required fields (including mealImage)
     if (!recipe_text || !calories || !protein || !carbs || !fat || !mealImage ||
         !cuisine || !meal_time || !diet_type || !spice_level) {
-          console.log("Missing required fields");
+          console.log("Missing required fields. Details:");
           console.log("recipe_text:", recipe_text);
           console.log("calories:", calories);
           console.log("protein:", protein);
           console.log("carbs:", carbs);
           console.log("fat:", fat);
-          console.log("mealImage:", mealImage);
+          console.log("mealImage:", mealImage); // This will show undefined if the file was truly missing
           console.log("cuisine:", cuisine);
           console.log("meal_time:", meal_time);
           console.log("diet_type:", diet_type);
           console.log("spice_level:", spice_level);
-
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
     const isHomecooked = price === '0' && location === 'Homecooked';
-     console.log("ok");
+    console.log("Meal type determined. Homecooked:", isHomecooked);
+
     if (isHomecooked) {
-      if (!prep_time_mins || isNaN(prep_time_mins)) {
-        return res.status(400).json({ error: 'prep_time_mins is required for homecooked meals' });
+      if (!prep_time_mins || isNaN(parseFloat(prep_time_mins))) { // Use parseFloat for robustness
+        return res.status(400).json({ error: 'prep_time_mins is required for homecooked meals and must be a number' });
       }
     } else {
-      if (!price || !location) {
-        return res.status(400).json({ error: 'price and location are required for non-homecooked meals' });
+      if (!price || !location || isNaN(parseFloat(price))) { // Also check price is a number
+        return res.status(400).json({ error: 'price and location are required for non-homecooked meals, and price must be a number' });
       }
     }
-    
+
     // Upload meal image
     const mealImagePath = `meals/${userId}/${Date.now()}-meal${path.extname(mealImage.originalname)}`;
     const { error: mealUploadError } = await supabase.storage
@@ -59,7 +68,10 @@ exports.uploadMeal = async (req, res) => {
         upsert: true,
       });
 
-    if (mealUploadError) throw mealUploadError;
+    if (mealUploadError) {
+      console.error('Supabase meal image upload error:', mealUploadError);
+      throw mealUploadError; // Re-throw to be caught by the outer catch
+    }
 
     const mealImageUrl = supabase.storage
       .from('meal-images')
@@ -67,7 +79,7 @@ exports.uploadMeal = async (req, res) => {
 
     // Upload optional recipe image
     let recipeImageUrl = null;
-    if (recipeImage) {
+    if (recipeImage) { // This check is correct: if recipeImage is null/undefined, it skips
       const recipeImagePath = `recipes/${userId}/${Date.now()}-recipe${path.extname(recipeImage.originalname)}`;
       const { error: recipeUploadError } = await supabase.storage
         .from('recipe-images')
@@ -76,22 +88,25 @@ exports.uploadMeal = async (req, res) => {
           upsert: true,
         });
 
-      if (recipeUploadError) throw recipeUploadError;
+      if (recipeUploadError) {
+        console.error('Supabase recipe image upload error:', recipeUploadError);
+        throw recipeUploadError; // Re-throw to be caught by the outer catch
+      }
 
       recipeImageUrl = supabase.storage
         .from('recipe-images')
         .getPublicUrl(recipeImagePath).data.publicUrl;
     }
 
-    console.log("inserting into db");
+    console.log("Inserting meal into database...");
 
     // Parse number values
     const parsedCalories = parseFloat(calories);
     const parsedProtein = parseFloat(protein);
     const parsedCarbs = parseFloat(carbs);
     const parsedFat = parseFloat(fat);
-    const parsedPrice = parseFloat(price);
-    const parsedPrepTime = prep_time_mins ? parseInt(prep_time_mins) : null;
+    const parsedPrice = isHomecooked ? 0 : parseFloat(price); // Ensure price is 0 for homecooked
+    const parsedPrepTime = isHomecooked ? parseInt(prep_time_mins) : 0; // Ensure prep_time_mins is 0 for non-homecooked
 
     // Insert meal record
     const { error: dbError } = await supabase.from('meals').insert([{
@@ -102,19 +117,22 @@ exports.uploadMeal = async (req, res) => {
       carbs: parsedCarbs,
       fat: parsedFat,
       meal_image_url: mealImageUrl,
-      recipe_image_url: recipeImageUrl,
+      recipe_image_url: recipeImageUrl, // Will be null if no recipeImage was provided
       created_at: new Date().toISOString(),
       cuisine,
       meal_time,
       diet_type,
       spice_level,
-      prep_time_mins: isHomecooked ? parsedPrepTime : 0,
-      price: isHomecooked ? 0 : parsedPrice,
-      location: isHomecooked ? '' : location,
+      prep_time_mins: parsedPrepTime, // Use parsed value
+      price: parsedPrice, // Use parsed value
+      location: isHomecooked ? '' : location, // Set location to empty string for homecooked
     }]);
 
-    if (dbError) throw dbError;
-    console.log("inserted meal into db");
+    if (dbError) {
+      console.error('Supabase DB insert error:', dbError);
+      throw dbError; // Re-throw to be caught by the outer catch
+    }
+    console.log("Meal inserted into database.");
 
     // Update profile nutrients
     const { data: profile, error: profileFetchError } = await supabase
@@ -123,7 +141,10 @@ exports.uploadMeal = async (req, res) => {
       .eq('id', userId)
       .single();
 
-    if (profileFetchError) throw profileFetchError;
+    if (profileFetchError) {
+      console.error('Supabase profile fetch error:', profileFetchError);
+      throw profileFetchError; // Re-throw
+    }
 
     const updatedProfile = {
       daily_calories: (profile.daily_calories || 0) + parsedCalories,
@@ -138,17 +159,19 @@ exports.uploadMeal = async (req, res) => {
       .update(updatedProfile)
       .eq('id', userId);
 
-    if (profileUpdateError) throw profileUpdateError;
+    if (profileUpdateError) {
+      console.error('Supabase profile update error:', profileUpdateError);
+      throw profileUpdateError; // Re-throw
+    }
     await redisClient.del(`user_profile:${userId}`);
     console.log(`🧹 Cleared Redis cache for profile of user ${userId}`);
 
     return res.status(200).json({ message: 'Meal uploaded and profile updated successfully!' });
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('Upload error (caught in controller):', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
-
 
 
 // const { OpenAI } = require('openai');

@@ -166,42 +166,7 @@ const updateProfile = async (req, res) => {
 
 
 
-// const getProfile = async (req, res) => {
-//   console.log("reached getProfile!");
-//   try {
-//     // Get the target user ID from the URL parameters
-//     const targetUserId = req.params.id;
 
-//     // Optional: You could add a check here if req.user.id is authorized to view targetUserId's profile
-//     // For now, any authenticated user can view any profile.
-
-//     console.log(`Getting profile for user ID: ${targetUserId}`);
-//     const { data: profile, error } = await supabase
-//       .from('profiles')
-//       .select(
-//         'id, username, display_name, bio, location, website, avatar_url, ' +
-//         'daily_calories, daily_protein, daily_carbs, daily_fat, ' +
-//         'calories_goal, protein_goal, carbs_goal, fat_goal'
-//       )
-//       .eq('id', targetUserId) // Use targetUserId from params
-//       .single();
-
-//     if (error) {
-//       console.error('Error fetching profile:', error);
-//       // If no profile is found for the given ID (PGRST116), return 404
-//       if (error.code === 'PGRST116') {
-//         return res.status(404).json({ error: 'Profile not found' });
-//       }
-//       return res.status(500).json({ error: 'Failed to fetch profile' });
-//     }
-
-//     // Return the profile data, which now includes the 'id' field
-//     return res.json(profile);
-//   } catch (err) {
-//     console.error('Unexpected error in getProfile:', err);
-//     return res.status(500).json({ error: 'Server error' });
-//   }
-// };
 
 
 
@@ -269,3 +234,40 @@ module.exports = {
   updateProfile,
   getProfile
 };
+
+// const getProfile = async (req, res) => {
+//   console.log("reached getProfile!");
+//   try {
+//     // Get the target user ID from the URL parameters
+//     const targetUserId = req.params.id;
+
+//     // Optional: You could add a check here if req.user.id is authorized to view targetUserId's profile
+//     // For now, any authenticated user can view any profile.
+
+//     console.log(`Getting profile for user ID: ${targetUserId}`);
+//     const { data: profile, error } = await supabase
+//       .from('profiles')
+//       .select(
+//         'id, username, display_name, bio, location, website, avatar_url, ' +
+//         'daily_calories, daily_protein, daily_carbs, daily_fat, ' +
+//         'calories_goal, protein_goal, carbs_goal, fat_goal'
+//       )
+//       .eq('id', targetUserId) // Use targetUserId from params
+//       .single();
+
+//     if (error) {
+//       console.error('Error fetching profile:', error);
+//       // If no profile is found for the given ID (PGRST116), return 404
+//       if (error.code === 'PGRST116') {
+//         return res.status(404).json({ error: 'Profile not found' });
+//       }
+//       return res.status(500).json({ error: 'Failed to fetch profile' });
+//     }
+
+//     // Return the profile data, which now includes the 'id' field
+//     return res.json(profile);
+//   } catch (err) {
+//     console.error('Unexpected error in getProfile:', err);
+//     return res.status(500).json({ error: 'Server error' });
+//   }
+// };
