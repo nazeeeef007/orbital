@@ -128,6 +128,7 @@ const recommendationHandler = async (req, res) => {
   }
 
   try {
+    console.log("reached recommendation handler");
     //
     // ─── 1) FETCH USER PROFILE & DAILY MACRO GOALS ─────────────────────────────
     //
@@ -347,7 +348,7 @@ const recommendationHandler = async (req, res) => {
     const top = scored
       .sort((a,b)=>b.score - a.score)
       .slice(0,20);
-    // console.log(top);
+    console.log(top);
     return res.json({ recommendations: top });
 
   } catch (err) {
