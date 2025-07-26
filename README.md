@@ -1,8 +1,8 @@
-# 🚀 NutriTrack: Your Personal AI-Powered Nutrition Companion
+# 🚀 NutriScan: Your Personal AI-Powered Nutrition Companion
 
 ## Redefining Wellness Through Seamless Calorie & Macro Tracking
 
-Welcome to **NutriTrack**, a cutting-edge mobile application designed to revolutionize how individuals approach their dietary health. In an increasingly health-conscious world, precise and personalized nutrition guidance is paramount. NutriTrack addresses this need head-on, offering an intuitive, AI-enhanced platform that goes beyond simple logging to provide intelligent recommendations, real-time analytics, and an engaging user experience.
+Welcome to **NutriScan**, a cutting-edge mobile application designed to revolutionize how individuals approach their dietary health. In an increasingly health-conscious world, precise and personalized nutrition guidance is paramount. NutriTrack addresses this need head-on, offering an intuitive, AI-enhanced platform that goes beyond simple logging to provide intelligent recommendations, real-time analytics, and an engaging user experience.
 
 We're building the future of personal nutrition management, making healthy eating accessible, understandable, and deeply integrated into daily life.
 
@@ -22,7 +22,7 @@ This synergistic architecture ensures a performant, scalable, and intelligent pl
 
 ## ✨ Key Features & User Experience Highlights
 
-NutriTrack delivers a rich set of features designed to empower users and drive consistent engagement:
+NutriScan delivers a rich set of features designed to empower users and drive consistent engagement:
 
 ### 1. Intuitive Meal Logging & Detailed Macro Tracking
 * **Effortless Input:** Users can quickly log their meals, inputting details such as `recipe_text`, `calories`, `protein`, `carbs`, and `fat`. The process is streamlined to minimize friction, encouraging consistent tracking.
@@ -61,7 +61,7 @@ NutriTrack delivers a rich set of features designed to empower users and drive c
 
 ## ⚙️ Technical Architecture & Configuration
 
-NutriTrack is built with modern, scalable technologies to deliver a high-performance and reliable experience.
+NutriScan is built with modern, scalable technologies to deliver a high-performance and reliable experience.
 
 ### **1. Frontend: React Native (Expo)**
 
@@ -101,7 +101,7 @@ A specialized **Node.js microservice** is responsible for the AI-driven chat fun
 
 ## ⚙️ Initial Setup & Configuration (Crucial for First Run)
 
-Before launching NutriTrack, it's essential to configure the network settings and API keys:
+Before launching NutriScan, it's essential to configure the network settings and API keys:
 
 1.  **Frontend (`frontend/config.ts`)**
     * Update `BASE_URL` with your local machine's IP address. This tells the mobile app where to connect to your backend server.
