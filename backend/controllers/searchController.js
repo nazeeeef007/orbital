@@ -1,4 +1,6 @@
-const supabase = require('../utils/supabaseClient');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY)
 
 const { v4: uuidv4 } = require('uuid');
 
