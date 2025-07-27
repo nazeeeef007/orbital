@@ -1,5 +1,7 @@
 const { redisClient } = require('../utils/redis'); // 👈 Add this line
-const supabase = require('../utils/supabaseClient');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY)
 
 // Helper: calculate TTL until 12AM SGT (UTC+8)
 function secondsUntilMidnightSGT() {

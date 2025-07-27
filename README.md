@@ -10,7 +10,7 @@ We're building the future of personal nutrition management, making healthy eatin
 
 ## 💡 The Core Innovation
 
-NutriTrack isn't just another calorie counter; it's an intelligent ecosystem built on three seamlessly integrated pillars:
+NutriScan isn't just another calorie counter; it's an intelligent ecosystem built on three seamlessly integrated pillars:
 
 * **📱 Frontend (Mobile App Interface):** A beautifully crafted React Native application delivering a fluid and engaging user experience. This is where users interact, log meals, visualize progress, and discover new healthy options.
 * **🛠 Backend (Robust API Server):** A powerful Node.js server acting as the central nervous system, managing user data, authentication, and serving critical dietary information and social interactions.
@@ -107,15 +107,7 @@ Before launching NutriScan, it's essential to configure the network settings and
         DATABASE_URL=postgres://user:password@host:port/database # Your PostgreSQL connection string
         JWT_SECRET=YOUR_VERY_SECRET_KEY # A strong, random key for JWT signing
         ```
-3.  **Bot Microservice (`bot-microservice/.env`)**
-    * Provide your `OPENAI_API_KEY` to enable the AI-powered chat bot.
-    * Set the `HOST` for the bot microservice to your IP address.
-        ```dotenv
-        # bot-microservice/.env
-        OPENAI_API_KEY=your_openai_api_key_here
-        HOST=YOUR_LOCAL_IP_ADDRESS # e.g., 192.168.68.108
-        PORT=3001 # Or your chosen port for the bot
-        ```
+
 
 💡 **How to find your local IP address:**
 Open your terminal or command prompt and run:
