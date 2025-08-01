@@ -1,6 +1,44 @@
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY)
+// const signup = async (req, res) => {
+//   const { email, password } = req.body;
+
+//   if (!email || !password)
+//     return res.status(400).json({ error: 'Email and password required' });
+
+//   // Password validation
+//   const isLongEnough = password.length >= 10;
+//   const hasUppercase = /[A-Z]/.test(password);
+//   const hasLowercase = /[a-z]/.test(password);
+//   const hasNumber = /\d/.test(password);
+
+//   if (!isLongEnough || !hasUppercase || !hasLowercase || !hasNumber) {
+//     return res.status(400).json({
+//       error:
+//         'Password must be at least 10 characters long and include at least one uppercase letter, one lowercase letter, and one number.',
+//     });
+//   }
+
+//   try {
+//     const { data, error } = await supabase.auth.admin.createUser({
+//       email,
+//       password,
+//       email_confirm: true,
+//     });
+
+//     if (error) {
+//       console.error(error);
+//       return res.status(500).json({ error: error.message });
+//     }
+
+//     return res.status(200).json({ message: 'User created', user: data.user });
+//   } catch (err) {
+//     console.error(err);
+//     return res.status(500).json({ error: 'Unexpected error during signup' });
+//   }
+// };
+
 const signup = async (req, res) => {
   const { email, password } = req.body;
 
@@ -32,7 +70,25 @@ const signup = async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
-    return res.status(200).json({ message: 'User created', user: data.user });
+    const userId = data.user.id;
+
+    // Create associated profile row
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert({
+        id: userId, // Must match the auth user id
+        username: email.split('@')[0], // Optional default username
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+    if (profileError) {
+      console.error('Failed to create profile:', profileError);
+      return res.status(500).json({ error: 'User created but failed to create profile.' });
+    }
+
+    return res.status(200).json({ message: 'User and profile created successfully', user: data.user });
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Unexpected error during signup' });
